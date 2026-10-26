@@ -2,7 +2,7 @@ include("heuristiques.jl")
 include("data.jl")
 include("metaheuristiques.jl")
 
-A = read_graph(list_graph_files()[1])
+A = lecture_graphe(liste_fichiers_graphes()[1])
 k = 10
 
 
