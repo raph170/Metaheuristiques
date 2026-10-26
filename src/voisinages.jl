@@ -70,6 +70,6 @@ function voisinage_k_color(k, solution, colors)
     return voisinage
 end
 
-println("Voisinage 2-swap  : ", voisinage_2_swap(solution_courante), " voisins")
-println("Voisinage 1-color : ", voisinage_1_color(solution_courante, couleurs), " voisins")
-println("Voisinage 2-color : ", voisinage_k_color(3, solution_courante, couleurs), " voisins")
+# println("Voisinage 2-swap  : ", voisinage_2_swap(solution_courante), " voisins")
+# println("Voisinage 1-color : ", voisinage_1_color(solution_courante, couleurs), " voisins")
+# println("Voisinage 2-color : ", voisinage_k_color(3, solution_courante, couleurs), " voisins")

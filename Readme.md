@@ -42,3 +42,15 @@ Pour aller plus loin que le simple tri par degré décroissant :
 - **Population :** un ensemble de colorations dans lequel on essaie de mpinimiser le nombre de conflits
 - **Mutation :**
   - On modifier aléatoirement la couleur de sommets en conflit (voisin *1-color* ou *2-color*).
+
+
+## Suivi du projet
+ - Implémentation VNS :
+   + améliorations faites : 
+     - on utilise finalament une liste d'adjacence pour trouver les conflits en temps constant
+     - la descente locale et les perturbations n'exlporent que les modifications de sommets impliqués dans des conflits (pas tous)
+   + améliorations à ajouter :
+     - autoriser les mouvements sur un plateau (quand le delta d'amélioration est nul)
+     - un tabou
+     - au lieu d'un tri sur les degrés statiques, on implémente DSATUR, qui permet de choisir dynamiquement à chaque pas le sommet qui a le plus grand nombre de couleurs différentes parmi ses voisins
+     - si pas d'amélioration au bout de 200 itérations, on retourne à l'ancienne meilleure solution
