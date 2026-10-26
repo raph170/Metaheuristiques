@@ -36,3 +36,4 @@ function increment_n_conflit(A, avant_changements, apres_changements, solution)
     return delta          
 end
     
+
