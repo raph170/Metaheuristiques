@@ -12,7 +12,7 @@ function n_conflit(A, solution)
     return N
 end
 
-function increment_n_conflit(A, avant_changements, apres_changements, solution)
+function increment_n_conflit(A, solution, avant_changements)
     nb_conflit_initial = 0
     nb_conflit_final = 0
     voisins = liste_voisins(A)
@@ -27,7 +27,7 @@ function increment_n_conflit(A, avant_changements, apres_changements, solution)
                     nb_conflit_initial += 1
                 end
             end
-            if apres_changements[u] == solution[v] # si v dans apres changements on a quand meme apres_changements[v]=solution[v]
+            if solution[u] == solution[v] 
                 nb_conflit_final += 1
             end
         end

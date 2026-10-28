@@ -1,4 +1,5 @@
 using Random
+Random.seed!(1234)
 
 function aleatoire(A,k)
     # affectation d'une couleur aléatoire à chaque sommet du graphe
