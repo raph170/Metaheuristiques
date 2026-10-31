@@ -49,8 +49,11 @@ Pour aller plus loin que le simple tri par degré décroissant :
    + améliorations faites : 
      - on utilise finalament une liste d'adjacence pour trouver les conflits en temps constant
      - la descente locale et les perturbations n'exlporent que les modifications de sommets impliqués dans des conflits (pas tous)
-   + améliorations à ajouter :
-     - autoriser les mouvements sur un plateau (quand le delta d'amélioration est nul)
-     - un tabou
+     - Si $k$ est supérieur au nombre de sommets en conflit, on prend tous les sommets en conflit ET on complète avec des sommets voisins
      - au lieu d'un tri sur les degrés statiques, on implémente DSATUR, qui permet de choisir dynamiquement à chaque pas le sommet qui a le plus grand nombre de couleurs différentes parmi ses voisins
-     - si pas d'amélioration au bout de 200 itérations, on retourne à l'ancienne meilleure solution
+     - autoriser les mouvements sur un plateau (quand le delta d'amélioration est nul) avec détection anti-cycle
+     - **Stratégie Best Improvement** avec $\Delta$-évaluation : au lieu de s'arrêter au premier voisin améliorant, on teste tous les sommets en conflit et toutes les couleurs pour appliquer le meilleur mouvement possible ($\min \Delta$)
+     - **Descente à Voisinage Variable (VND)** : couplage de $V_1$ (1-color) et $V_2$ (2-color ciblé) au sein de la descente locale. Dès qu'un minimum local strict en 1-color est atteint, le 2-color débloque la situation et renvoie immédiatement vers $V_1$
+     - **Backtracking historique** : mémorisation des meilleures solutions records et retour en arrière séquentiel après 4 stagnations consécutives
+   + améliorations à ajouter :
+     - un tabou
