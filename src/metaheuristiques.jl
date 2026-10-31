@@ -1,21 +1,27 @@
 include("voisinages.jl")
 
-function recuit_simule(A, k, T, heuristique, voisinage, mu, n_iter_max, log=false)
+function recuit_simule(A, k, T, heuristique, voisinage, mu; limite_temps = 600, log=false)
     # recuit simulé choix aléatoire voisin dans le voisinage considéré
     # les nombres de conflits sont calculés pour toute la solution à chaque itération, 
     # calculer le cout incremental plutot que le cout total n'ameliore pas le temps de résolution, au contraire, c est un peu plus long
+    avant_boucle = time()
     solution = heuristique(A, k) #solution initiale
-    nb_conflit = n_conflit(A, solution)
+    nb_conflit,_ = n_conflit(A, solution)
     meilleure_solution = deepcopy(solution)
     nb_conflit_min = nb_conflit
     nb_conflit_initial = nb_conflit
     n_iter = 1
-    while n_iter <= n_iter_max
+    duree_resolution = time() - avant_boucle
+    while duree_resolution < limite_temps
+        debut_boucle = time()
+        if nb_conflit_min == 0
+            break
+        end
         if log 
-            println("itération ", n_iter)
+            println("itération ", n_iter, " | conflits courants : ",nb_conflit," | meilleurs conflits : ",nb_conflit_min)
         end
         voisin, avant_changements = voisinage(solution)
-        nb_conflit_voisin = n_conflit(A, voisin)
+        nb_conflit_voisin,_ = n_conflit(A, voisin)
         delta = nb_conflit_voisin - nb_conflit
         if log 
             println("nouveau voisin à une distance ",delta, " de la solution courante")
@@ -27,11 +33,12 @@ function recuit_simule(A, k, T, heuristique, voisinage, mu, n_iter_max, log=fals
             solution = voisin
             nb_conflit = nb_conflit_voisin
             if nb_conflit < nb_conflit_min
-                if log 
-                    println("meilleure solution améliorée à l'itération ", n_iter)
-                end
                 nb_conflit_min = nb_conflit
                 meilleure_solution = voisin
+                if log 
+                    println("meilleure solution améliorée à l'itération ", n_iter)
+                    println("cout de cette solution : ",nb_conflit_min)
+                end
             end
         else
             if log
@@ -49,62 +56,189 @@ function recuit_simule(A, k, T, heuristique, voisinage, mu, n_iter_max, log=fals
         end
         T = mu*T
         n_iter += 1
+        duree_resolution += time() - avant_boucle
     end
-    return meilleure_solution, nb_conflit_initial, nb_conflit_min
+    return meilleure_solution, nb_conflit_initial, nb_conflit_min, T, duree_resolution
 end
 
 
-function recherche_tabou(A, k, heuristique, voisinage, len_tabou, n_iter_max, log = false)
-    # recherche tabou avec calcul du cout total, tester cout incremental mais a priori moins rapide
-    # a tester : recherche tabou a voisinage variable : commencer par petits voisinages 
-    # (dès que la solution est ameliorée on arrete de regarder ce voisinage)
-    # a tester : len tabou variable en fonction du nombre d'itérations : commencer par grande puis diminuer 
-    solution = heuristique(A, k) #solution initiale
-    nb_conflit = n_conflit(A, solution)
+function recherche_tabou(A, k, heuristique, voisinage, len_tabou ; taille_echantillon=5, taille_voisinage=5, n_iter_max_sans_amelioration=2000, limite_temps=600, log=false)
+    avant_resolution = time()
+    solution = heuristique(A, k) # solution initiale
     meilleure_solution = deepcopy(solution)
-    nb_conflit_min = nb_conflit
+    temps_meilleure_solution = time() - avant_resolution
+    N_solutions = 0
+    n = size(A, 1) # nombre de sommets
+    adj = liste_voisins(A) # liste d'adjacence
+
+    # C[u,c] = nombre de voisins de u de couleur c
+    C = zeros(Int, n, k)
+    for u in 1:n
+        for v in adj[u]
+            C[u, solution[v]] += 1
+        end
+    end
+
+    # nombre de conflits par sommet
+    conflits = [C[u, solution[u]] for u in 1:n]
+    # Nombre total de conflits
+    nb_conflit = sum(conflits) ÷ 2
     nb_conflit_initial = nb_conflit
+    nb_conflit_min = nb_conflit
+    if log
+        println("nombre de conflits initial : ", nb_conflit_initial)
+    end
+
+    # Ensemble des sommets en conflit
+    # on utilise 2 listes pour que les tests d'appartenance d'un sommet aux sommets en conflits soient en O(1)
+    sommets_avec_conflits = Int[]
+    positions = zeros(Int, n)
+    for u in 1:n
+        if conflits[u] > 0
+            ajouter_conflit(sommets_avec_conflits, positions, u)
+        end
+    end
+
+    tabous = ones(Int, n, k)
     n_iter = 1
-    n = size(A)[1] # nombre de sommets
-    tabous = [[1 for couleur in 1:k] for sommet in 1:n] # TODO : modifier : tabous doit etre une matruce sommets * couleurs, une solution x est un dictionnaire s=>color
-    while n_iter <= n_iter_max
-        if log 
-            println("itération ", n_iter)
+    n_iter_sans_amelioration = 0
+    duree_resolution = time() - avant_resolution
+
+    # boucle principale
+    while duree_resolution < limite_temps
+        debut_boucle = time()
+        if nb_conflit_min == 0
+            break
         end
-        voisins = voisinage(solution)
-        tabou = true
-        idx_voisin_1 = 0
-        voisin_1 = nothing
-        while tabou && idx_voisin_1 < n # premiere voisin non tabou
-            idx_voisin_1 += 1
-            voisin_1, _ = voisins[idx_voisin_1]
-            tabou = prod([tabous[sommet][couleur] <= n_iter for (sommet, couleur) in voisin_1]) == false
+        if isempty(sommets_avec_conflits) || k <= 1
+            break
         end
-        nb_conflit_voisin_1 = n_conflit(A, voisin_1)
-        for (voisin, _) in voisins
-            nb_conflit_voisin = n_conflit(A,voisin)
-            if prod([tabous[sommet][couleur] <= n_iter for (sommet, couleur) in voisin]) && nb_conflit_voisin < nb_conflit
-                voisin_1 = voisin
-                nb_conflit_voisin_1 = nb_conflit_voisin
-            else
-                if nb_conflit_voisin < nb_conflit_min
-                    voisin_1 = voisin
-                    nb_conflit_voisin_1 = nb_conflit_voisin
-                    meilleure_solution = voisin
-                    nb_conflit_min = nb_conflit_voisin
+        if log
+            println("itération ", n_iter, " | conflits courants : ", nb_conflit, 
+            " | meilleurs conflits : ", nb_conflit_min, " | nb iter sans amélioration : ", n_iter_sans_amelioration)
+        end
+        if n_iter_sans_amelioration > n_iter_max_sans_amelioration
+            if log
+                println("Aucune amélioration depuis ",n_iter_max_sans_amelioration," itérations : phase de perturbation forcée.")
+            end
+            solution, _ = voisinage(solution, k, taille_voisinage)
+            n_iter_sans_amelioration = 0
+
+            fill!(C, 0)
+            for u in 1:n
+                for v in adj[u]
+                    C[u, solution[v]] += 1
+                end
+            end
+
+            for u in 1:n
+                conflits[u] = C[u, solution[u]]
+            end
+            nb_conflit = sum(conflits) ÷ 2
+
+            empty!(sommets_avec_conflits)
+            fill!(positions, 0)
+            for u in 1:n
+                if conflits[u] > 0
+                    ajouter_conflit(sommets_avec_conflits, positions, u)
+                end
+            end
+
+            fill!(tabous, 1)
+        end
+
+        # compromis entre explorer tout le voisinage (tres couteux) et 
+        #choisir un sommet avec conflits et la meilleure couleur pour ce sommet :
+        # compromis entre les 2 : meilleur voisin parmi les taille_echantillon sommets avec conflits
+        nb_sommets_avec_conflits = length(sommets_avec_conflits)
+        taille_echantillon_effectif = min(taille_echantillon, nb_sommets_avec_conflits)
+        indices = Set{Int}()
+        while length(indices) < taille_echantillon_effectif
+            push!(indices, rand(1:nb_sommets_avec_conflits)) # indices est un set donc tous les indices seront distincts, on n'aura pas 2 fois le meme sommet sans conflit
+        end
+        sommets_choisis = [sommets_avec_conflits[i] for i in indices]
+
+        meilleur_delta = typemax(Int)
+        meilleur_sommet = nothing
+        meilleure_couleur = nothing
+        meilleur_delta_global = typemax(Int)
+        meilleur_sommet_global = nothing
+        meilleure_couleur_globale = nothing
+
+        for u in sommets_choisis
+            ancienne_couleur = solution[u]
+            cout_actuel = C[u, ancienne_couleur]
+            for c in 1:k
+                if c == ancienne_couleur
+                    continue
+                end
+                delta = C[u,c] - cout_actuel
+                # Meilleur mouvement, même s'il est tabou (utile dans le cas ou tous les voisins sont tabous)
+                if delta < meilleur_delta_global
+                    meilleur_delta_global = delta
+                    meilleur_sommet_global = u
+                    meilleure_couleur_globale = c
+                end
+
+                tabou = tabous[u,c] > n_iter
+                aspiration = nb_conflit + delta < nb_conflit_min
+                if (!tabou || aspiration) && delta < meilleur_delta
+                    meilleur_delta = delta
+                    meilleur_sommet = u
+                    meilleure_couleur = c
                 end
             end
         end
-        solution = voisin_1
-        nb_conflit = nb_conflit_voisin_1
+
+        if meilleur_sommet == nothing
+            if log
+                println("Aucun voisin non tabou dans le voisinage : on va choisir le meilleur voisin (même si tabou)")
+            end
+            meilleur_sommet = meilleur_sommet_global
+            meilleure_couleur = meilleure_couleur_globale
+            meilleur_delta = meilleur_delta_global
+        end
+
+        u = meilleur_sommet
+        ancienne_couleur = solution[u]
+        nouvelle_couleur = meilleure_couleur
+
+        # on met a jour les nombres de conflits
+        nb_conflit += meilleur_delta
+        for v in adj[u]
+            conflits[v] += Int(solution[v] == nouvelle_couleur) - Int(solution[v] == ancienne_couleur)
+            C[v, ancienne_couleur] -= 1
+            C[v, nouvelle_couleur] += 1
+            if conflits[v] > 0
+                ajouter_conflit(sommets_avec_conflits, positions, v)
+            else
+                retirer_conflit(sommets_avec_conflits, positions, v)
+            end
+        end
+
+        solution[u] = nouvelle_couleur
+        conflits[u] = C[u, nouvelle_couleur]
+        if conflits[u] == 0
+            retirer_conflit(sommets_avec_conflits, positions, u)
+        end
+        
         if nb_conflit < nb_conflit_min
-            meilleure_solution = solution
+            temps_meilleure_solution = time() - avant_resolution
+            meilleure_solution = deepcopy(solution)
             nb_conflit_min = nb_conflit
+            if log
+                println("Nouvelle meilleure solution : ", nb_conflit_min)
+            end
+            n_iter_sans_amelioration = 0
+        else 
+            n_iter_sans_amelioration += 1
         end
-        for (sommet, couleur) in solution
-            tabous[sommet][couleur] = n_iter + len_tabou
-        end
+
+        tabous[u, ancienne_couleur] = n_iter + len_tabou
         n_iter += 1
+        duree_resolution += time() - debut_boucle
+        N_solutions += taille_echantillon_effectif * (k-1) # nombre de solution explorées à chaque itération
     end
-    return meilleure_solution, nb_conflit_initial, nb_conflit_min
+    vitesse_exploration = N_solutions/duree_resolution
+    return meilleure_solution, nb_conflit_initial, nb_conflit_min, duree_resolution, temps_meilleure_solution, vitesse_exploration
 end

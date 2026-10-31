@@ -1,8 +1,7 @@
-function liste_fichiers_graphes()
-    dir = "C:/Users/rapha/OneDrive/Bureau/ENPC/3A/MPRO/Métaheuristiques/Metaheuristiques/data/graphs"
+function liste_fichiers_graphes(dir)
     fichiers = []
     for nom_fichier in readdir(dir)
-        chemin = dir * '/' * nom_fichier
+        chemin =  nom_fichier
         push!(fichiers, chemin)
     end 
     return fichiers
@@ -34,7 +33,3 @@ function liste_voisins(A)
     voisins = Dict(u => [v for v in 1:n if A[u,v] == 1] for u in 1:n)
     return voisins
 end
-
-A = lecture_graphe(liste_fichiers_graphes()[1])
-
-liste_voisins(A)

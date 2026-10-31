@@ -1,4 +1,5 @@
 using Combinatorics
+using StatsBase
 
 # couleurs = [1, 2, 3]
 # solution_courante = [1, 3, 2]
@@ -41,17 +42,29 @@ function voisinage_1_echange(solution, k)
                 new_sol = copy(solution)
                 ancienne_couleur = solution[i]
                 new_sol[i] = color
-                push!(voisinage, (new_sol,Dict(i=>ancienne_couleur,i=>color)))
+                push!(voisinage, (new_sol,Dict(i=>ancienne_couleur)))
             end
         end
     end
     return voisinage
 end
 
-# function _1_echange(solution,k)
+function _1_echange(solution)
+    #retourne un seul voisin
+    n = length(solution)
+    i = rand(1:n)
+    c = rand(1:k)
+    while c == solution[i]
+        c = rand(1:k)
+    end
+    new_sol = copy(solution)
+    new_sol[i] = c
+    return (new_sol,Dict(i=>solution[i]))
+end
 
 # on change la couleur de k sommets
-function voisinage_k_color(k, solution, colors)
+function voisinage_k_color(solution, k)
+    colors = 1:k
     if k <= 0
         return []
     end
@@ -85,6 +98,23 @@ function voisinage_k_color(k, solution, colors)
         append!(voisinage, curr_sols)
     end
     return voisinage
+end
+
+function _p_echange(solution, k, p)
+    #retourne un seul voisin
+    n = length(solution)
+    sommets = sample(1:n, p, replace=false) # p sommets distincts 2 à 2
+    new_sol = deepcopy(solution)
+    avant_changements = Dict()
+    for u in sommets
+        c = rand(1:k)
+        while c == solution[u]
+            c = rand(1:k)
+        end
+        new_sol[u] = c
+        avant_changements[u] = solution[u]
+    end
+    return (new_sol,avant_changements)
 end
 
 # println("Voisinage 2-swap  : ", voisinage_2_echange(solution_courante), " voisins")
