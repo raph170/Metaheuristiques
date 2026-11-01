@@ -18,7 +18,7 @@ function recuit_simule(A, k, T, heuristique, voisinage, mu; limite_temps = 600, 
             break
         end
         if log 
-            println("itération ", n_iter, " | conflits courants : ",nb_conflit," | meilleurs conflits : ",nb_conflit_min)
+            println("Iter ", n_iter, "||conflits courants : ",nb_conflit,"||meilleurs conflits : ",nb_conflit_min, "||Temps : ", round(duree_resolution; digits = 2))
         end
         voisin, avant_changements = voisinage(solution)
         nb_conflit_voisin,_ = n_conflit(A, voisin)
@@ -56,20 +56,21 @@ function recuit_simule(A, k, T, heuristique, voisinage, mu; limite_temps = 600, 
         end
         T = mu*T
         n_iter += 1
-        duree_resolution += time() - avant_boucle
+        duree_resolution += time() - debut_boucle
     end
     return meilleure_solution, nb_conflit_initial, nb_conflit_min, T, duree_resolution
 end
 
 
-function recherche_tabou(A, k, heuristique, voisinage, len_tabou ; taille_echantillon=5, taille_voisinage=5, n_iter_max_sans_amelioration=2000, limite_temps=600, log=false)
+function recherche_tabou(A, n, k, heuristique, voisinage, len_tabou ; taille_echantillon=5, taille_voisinage=5, n_iter_max_sans_amelioration=2500, n_perturbation_max_sans_amelioration = 3, limite_temps=600, log=false)
+    taille_echantillon_initiale = taille_echantillon
+    taille_voisinage_initiale = taille_voisinage
     avant_resolution = time()
     solution = heuristique(A, k) # solution initiale
     meilleure_solution = deepcopy(solution)
     temps_meilleure_solution = time() - avant_resolution
     N_solutions = 0
-    n = size(A, 1) # nombre de sommets
-    adj = liste_voisins(A) # liste d'adjacence
+    adj = liste_voisins(A,n) # liste d'adjacence
 
     # C[u,c] = nombre de voisins de u de couleur c
     C = zeros(Int, n, k)
@@ -102,6 +103,7 @@ function recherche_tabou(A, k, heuristique, voisinage, len_tabou ; taille_echant
     tabous = ones(Int, n, k)
     n_iter = 1
     n_iter_sans_amelioration = 0
+    n_perturbation_sans_amelioration = -1
     duree_resolution = time() - avant_resolution
 
     # boucle principale
@@ -114,15 +116,29 @@ function recherche_tabou(A, k, heuristique, voisinage, len_tabou ; taille_echant
             break
         end
         if log
-            println("itération ", n_iter, " | conflits courants : ", nb_conflit, 
-            " | meilleurs conflits : ", nb_conflit_min, " | nb iter sans amélioration : ", n_iter_sans_amelioration)
+            println("Iter ", n_iter, "||conflits courants : ", nb_conflit, 
+            "||meilleurs conflits : ", nb_conflit_min, "||nb iter sans amélioration : ", n_iter_sans_amelioration, "||Temps : ", round(duree_resolution; digits = 2))
         end
         if n_iter_sans_amelioration > n_iter_max_sans_amelioration
             if log
                 println("Aucune amélioration depuis ",n_iter_max_sans_amelioration," itérations : phase de perturbation forcée.")
             end
-            solution, _ = voisinage(solution, k, taille_voisinage)
             n_iter_sans_amelioration = 0
+            n_perturbation_sans_amelioration += 1
+            if n_perturbation_sans_amelioration % n_perturbation_max_sans_amelioration == 0 && n_perturbation_sans_amelioration > 0
+                if log
+                    println("Aucune amélioration depuis ",n_perturbation_max_sans_amelioration," perturbations forcée : on agrandit la taille du voisinage exploré.")
+                end
+                taille_echantillon = min(30, taille_echantillon + 5)
+                taille_voisinage = min(30, taille_voisinage + 5)
+            end
+            solution, _ = voisinage(solution, k, taille_voisinage)
+            # p = rand()
+            # if p<0.5
+            #     solution, _ = voisinage(meilleure_solution, k, taille_voisinage)
+            # else
+            #     solution, _ = voisinage(solution, k, taille_voisinage)
+            # end    
 
             fill!(C, 0)
             for u in 1:n
@@ -230,10 +246,17 @@ function recherche_tabou(A, k, heuristique, voisinage, len_tabou ; taille_echant
                 println("Nouvelle meilleure solution : ", nb_conflit_min)
             end
             n_iter_sans_amelioration = 0
+            n_perturbation_sans_amelioration = 0
+            taille_echantillon = taille_echantillon_initiale # on repart d'un voisinage de taille plus restreinte
+            taille_voisinage = taille_voisinage_initiale
         else 
             n_iter_sans_amelioration += 1
         end
 
+        len_tabou = div(0.6*nb_conflit_min + rand(0:9),1) # mis à jour dynamique de len_tabou
+        if log
+            println("len tabou = ", len_tabou)
+        end
         tabous[u, ancienne_couleur] = n_iter + len_tabou
         n_iter += 1
         duree_resolution += time() - debut_boucle
