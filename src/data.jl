@@ -7,31 +7,39 @@ function liste_fichiers_graphes(dir)
     return fichiers
 end
 
-function lecture_graphe(path::String)
+
+function lecture_graphe_avec_voisins(path::String)
     A = nothing
     n = nothing
     e = nothing
+    adj = Vector{Int}[]
+
     open(path) do f
         while !eof(f)
-            s = readline(f)
+            s = strip(readline(f))
             fields = split(s)
-            if fields[1] == "p"
+
+            if isempty(fields)
+                continue
+            elseif fields[1] == "p"
                 n = parse(Int, fields[3])
                 e = parse(Int, fields[4])
                 A = zeros(Int, n, n)
+                adj = [Int[] for _ in 1:n]
+
             elseif fields[1] == "e"
                 u = parse(Int, fields[2])
                 v = parse(Int, fields[3])
+
                 A[u, v] = 1
                 A[v, u] = 1
+                push!(adj[u], v)
+                push!(adj[v], u)
             end
         end
     end
-    return A, n, e
+
+    return A, adj, n, e
 end
 
-function liste_voisins(A,n)
-    #retourne un dictionnaire des voisins de chaque sommet
-    voisins = Dict(u => [v for v in 1:n if A[u,v] == 1] for u in 1:n)
-    return voisins
-end
+

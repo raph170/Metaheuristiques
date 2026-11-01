@@ -1,25 +1,21 @@
-function n_conflit(A, solution)
-    # fonction évaluant le nombre total de conflits d'une solution et le nombre de conflits par sommet 
-    n = size(A)[1]
-    N_conflit_total = 0
-    N_conflit_par_sommet = Dict(u => 0 for u in 1:n)
-    for u in 1:(n-1)
-        for v in u+1:n 
-            if A[u,v] ==1 && (solution[u]==solution[v])
-                N_conflit_total += 1
-                N_conflit_par_sommet[u] += 1
+# nombre d'arêtes en conflit (même couleur aux 2 extrémités)
+function nb_conflits(solution, adj::Vector{Vector{Int}})
+    conflits = 0
+    for u in 1:length(solution)
+        for v in adj[u]
+            if u < v && solution[u] == solution[v]
+                conflits += 1
             end
         end
     end
-    return N_conflit_total, N_conflit_par_sommet
+    return conflits
 end
 
-function increment_n_conflit(A, solution, avant_changements)
+function increment_n_conflit(A, adj, solution, avant_changements)
     nb_conflit_initial = 0
     nb_conflit_final = 0
-    voisins = liste_voisins(A)
     for u in keys(avant_changements) # memes sommets pour avant et apres, seules les valeurs du dictionnaire (couleurs) changent
-        for v in voisins[u]
+        for v in adj[u]
             if v in keys(avant_changements)
                 if avant_changements[u] == avant_changements[v]
                     nb_conflit_initial += 1
@@ -59,3 +55,16 @@ function retirer_conflit(sommets, positions, u)
 end
     
 
+# détection des sommets en conflit (pour cibler les recherches)
+function get_sommets_en_conflit(solution, adj)
+    conflicts = Int[]
+    for u in 1:length(solution)
+        for v in adj[u]
+            if solution[u] == solution[v]
+                push!(conflicts, u)
+                break # On ne compte ce sommet qu'une seule fois
+            end
+        end
+    end
+    return conflicts
+end

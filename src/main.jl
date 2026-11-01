@@ -1,7 +1,10 @@
 include("heuristiques.jl")
 include("data.jl")
+include("voisinages.jl")
 include("metaheuristiques.jl")
 include("solution.jl")
+include("VND_VNS.jl")
+
 using Random
 
 dir = "C:/Users/rapha/OneDrive/Bureau/ENPC/3A/MPRO/Métaheuristiques/Metaheuristiques/data/graphs/"
@@ -19,10 +22,10 @@ couleurs = Dict(
 # C2000.5.col.txt 30 
 # c 4000 80
 
-nom_fichier = "flat300_26_0.col.txt"
+nom_fichier = "le450_15c.col.txt"
 
 avant_graphe = time()
-A, n, nombre_aretes = lecture_graphe(dir * "/" * nom_fichier)
+A, adj, n, nombre_aretes = lecture_graphe_avec_voisins(dir * "/" * nom_fichier)
 apres_graphe = time()
 println("temps creation matrice adjacence : ", apres_graphe - avant_graphe)
 k = couleurs[nom_fichier][1]
@@ -46,7 +49,8 @@ limite_temps = 600
 
 # meta_heuristique = "recherche tabou"
 # meta_heuristique = "recherche tabou range len_tabou"
-meta_heuristique = "recuit simulé"
+# meta_heuristique = "recuit simulé"
+meta_heuristique = "VND"
 
 
 #####################
@@ -57,7 +61,7 @@ if meta_heuristique == "recuit simulé"
     mu = 0.99
     voisinage = _1_echange
 
-    meilleure_solution, nb_conflits_initial, nb_conflits_final,T, duree_resolution = recuit_simule(A, k, T, heuristique, voisinage, mu; limite_temps = 600, log=true)
+    meilleure_solution, nb_conflits_initial, nb_conflits_final,T, duree_resolution = recuit_simule(A, adj, k, T, heuristique, voisinage, mu; limite_temps = 600, log=true)
     println("nb_conflit_initial : ", nb_conflits_initial )
     println("nb_conflit_final : ", nb_conflits_final )
     println("durée de résolution : ", duree_resolution)
@@ -85,7 +89,7 @@ if meta_heuristique == "recherche tabou"
     ][i, j]
     println("len tabou = ", len_tabou)
     
-    meilleure_solution, nb_conflits_initial, nb_conflits_final, duree_resolution, temps_meilleure_solution, vitesse_exploration = recherche_tabou(A,n, k, heuristique, voisinage, len_tabou ; taille_echantillon=10, taille_voisinage=5, n_iter_max_sans_amelioration=2000, n_perturbation_max_sans_amelioration = 3, limite_temps=limite_temps, log=true)
+    meilleure_solution, nb_conflits_initial, nb_conflits_final, duree_resolution, temps_meilleure_solution, vitesse_exploration = recherche_tabou(A, adj, n, k, heuristique, voisinage, len_tabou ; taille_echantillon=20, taille_voisinage=5, n_iter_max_sans_amelioration=2000, n_perturbation_max_sans_amelioration = 5, limite_temps=limite_temps, log=true)
     println("nb_conflit_initial : ", nb_conflits_initial )
     println("nb_conflit_final : ", nb_conflits_final )
     println("durée de résolution : ", duree_resolution)
@@ -104,7 +108,7 @@ if meta_heuristique == "recherche tabou range len_tabou"
     for len_tabou in len_tabous
         println("len tabou = ", len_tabou)
         Random.seed!(1234)
-        meilleure_solution, nb_conflits_initial, nb_conflits_final, duree_resolution, temps_meilleure_solution, vitesse_exploration = recherche_tabou(A, k, heuristique, voisinage, len_tabou ; taille_echantillon=10, taille_voisinage=5, n_iter_max_sans_amelioration=2500, n_perturbation_sans_amelioration_max = 3, limite_temps=limite_temps, log=false)
+        meilleure_solution, nb_conflits_initial, nb_conflits_final, duree_resolution, temps_meilleure_solution, vitesse_exploration = recherche_tabou(A, adj, k, heuristique, voisinage, len_tabou ; taille_echantillon=10, taille_voisinage=5, n_iter_max_sans_amelioration=2500, n_perturbation_sans_amelioration_max = 3, limite_temps=limite_temps, log=false)
 
         resulats[len_tabou] = Dict("nb conflits initial" => nb_conflits_initial, "nb conflits final" => nb_conflits_final, "duree resolution" => duree_resolution, "temps meilleure solution" => temps_meilleure_solution, "vitesse exploration" => vitesse_exploration)
         println("len tabou = ", len_tabou)
@@ -116,5 +120,15 @@ if meta_heuristique == "recherche tabou range len_tabou"
     end
     print(resulats)
 end
+
+
+#######################
+######### VND #########
+#######################
+if meta_heuristique == "VND"
+    sol, conflits = VNS(A, k; adj=adj, max_iter=2000, k_max=50)
+    println(conflits)
+end
+
 
 

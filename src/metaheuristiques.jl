@@ -1,12 +1,12 @@
 include("voisinages.jl")
 
-function recuit_simule(A, k, T, heuristique, voisinage, mu; limite_temps = 600, log=false)
+function recuit_simule(A, adj, k, T, heuristique, voisinage, mu; limite_temps = 600, log=false)
     # recuit simulé choix aléatoire voisin dans le voisinage considéré
     # les nombres de conflits sont calculés pour toute la solution à chaque itération, 
     # calculer le cout incremental plutot que le cout total n'ameliore pas le temps de résolution, au contraire, c est un peu plus long
     avant_boucle = time()
     solution = heuristique(A, k) #solution initiale
-    nb_conflit,_ = n_conflit(A, solution)
+    nb_conflit = nb_conflits(solution,adj)
     meilleure_solution = deepcopy(solution)
     nb_conflit_min = nb_conflit
     nb_conflit_initial = nb_conflit
@@ -21,7 +21,7 @@ function recuit_simule(A, k, T, heuristique, voisinage, mu; limite_temps = 600, 
             println("Iter ", n_iter, "||conflits courants : ",nb_conflit,"||meilleurs conflits : ",nb_conflit_min, "||Temps : ", round(duree_resolution; digits = 2))
         end
         voisin, avant_changements = voisinage(solution)
-        nb_conflit_voisin,_ = n_conflit(A, voisin)
+        nb_conflit_voisin = nb_conflits(voisin,adj)
         delta = nb_conflit_voisin - nb_conflit
         if log 
             println("nouveau voisin à une distance ",delta, " de la solution courante")
@@ -56,13 +56,13 @@ function recuit_simule(A, k, T, heuristique, voisinage, mu; limite_temps = 600, 
         end
         T = mu*T
         n_iter += 1
-        duree_resolution += time() - debut_boucle
+        duree_resolution += time() - avant_boucle
     end
     return meilleure_solution, nb_conflit_initial, nb_conflit_min, T, duree_resolution
 end
 
 
-function recherche_tabou(A, n, k, heuristique, voisinage, len_tabou ; taille_echantillon=5, taille_voisinage=5, n_iter_max_sans_amelioration=2500, n_perturbation_max_sans_amelioration = 3, limite_temps=600, log=false)
+function recherche_tabou(A, adj, n, k, heuristique, voisinage, len_tabou ; taille_echantillon=5, taille_voisinage=5, n_iter_max_sans_amelioration=2500, n_perturbation_max_sans_amelioration = 3, limite_temps=600, log=false)
     taille_echantillon_initiale = taille_echantillon
     taille_voisinage_initiale = taille_voisinage
     avant_resolution = time()
@@ -70,7 +70,6 @@ function recherche_tabou(A, n, k, heuristique, voisinage, len_tabou ; taille_ech
     meilleure_solution = deepcopy(solution)
     temps_meilleure_solution = time() - avant_resolution
     N_solutions = 0
-    adj = liste_voisins(A,n) # liste d'adjacence
 
     # C[u,c] = nombre de voisins de u de couleur c
     C = zeros(Int, n, k)
@@ -133,12 +132,12 @@ function recherche_tabou(A, n, k, heuristique, voisinage, len_tabou ; taille_ech
                 taille_voisinage = min(30, taille_voisinage + 5)
             end
             solution, _ = voisinage(solution, k, taille_voisinage)
-            # p = rand()
-            # if p<0.5
-            #     solution, _ = voisinage(meilleure_solution, k, taille_voisinage)
-            # else
-            #     solution, _ = voisinage(solution, k, taille_voisinage)
-            # end    
+            p = rand()
+            if p<0.5
+                solution, _ = voisinage(meilleure_solution, k, taille_voisinage)
+            else
+                solution, _ = voisinage(solution, k, taille_voisinage)
+            end    
 
             fill!(C, 0)
             for u in 1:n
