@@ -57,3 +57,19 @@ Pour aller plus loin que le simple tri par degré décroissant :
      - **Backtracking historique** : mémorisation des meilleures solutions records et retour en arrière séquentiel après 4 stagnations consécutives
    + améliorations à ajouter :
      - un tabou
+
+     
+## 5. Résultats expérimentaux
+
+### Tableau des meilleurs résultats
+
+| Instance | Sommets ($n$) | Arêtes ($m$) | Couleurs cibles ($k$) | Heuristique Initiale (DSATUR) | Meilleur Résultat VNS (Conflits) | Statut de la solution |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`dsjc125.1.col`** | 125 | 736 | **5** | 10 *(37 au glouton)* | **0** *(1 itér.)* | **Optimal prouvé** ($\chi = 5$) |
+| **`dsjc125.9.col`** | 125 | 6 961 | **44** | 20 | **0** *(1 itér.)* | **Optimal prouvé** ($\chi = 44$) |
+| **`dsjc250.1.col`** | 250 | 3 218 | **8** | 50 | **0** *(1983 itér.)* | **Optimal prouvé** ($\chi = 8$) |
+| **`dsjc250.5.col`** | 250 | 15 668 | **28** | 93 | **7** | **99,96 %** arêtes valides |
+| **`dsjc250.9.col`** | 250 | 55 794 | **72** | 62 | **0** *(1222 itér.)* | **Optimal prouvé** ($\chi = 72$) |
+| **`flat300_26_0.col`** | 300 | 21 633 | **26** | 206 | **64** | $-68,9\%$ |
+| **`le450_15c.col`** | 450 | 16 680 | **15** | 317 | **163** | $-48,6\%$ |
+| **`dsjc1000.5.col`** | 1 000 | 249 826 | **83** | 467 | **110** *(itér. 989)* | $-76,4\%$ |
