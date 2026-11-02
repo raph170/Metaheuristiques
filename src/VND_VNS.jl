@@ -156,10 +156,15 @@ function meilleur_mvt_2_color(solution, adj, couleurs, sommets_conf; sommets_vis
 end
 
 # Descente à Voisinage Variable (VND) : V_1 (1-color) puis V_2 (2-color)
-function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eval_counter=nothing)
+function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eval_counter=nothing, type_obj="classique")
     sol_courante = copy(solution)
     conflits_courant = nb_conflits(sol_courante, adj)
     max_c = maximum(couleurs)
+    n = length(sol_courante)
+    
+    is_pondere = (type_obj == "pondere")
+    conflits_par_sommet = is_pondere ? [count(v -> sol_courante[v] == sol_courante[u], adj[u]) for u in 1:n] : Int[]
+    somme_voisins_ponderee = is_pondere ? zeros(Int, max_c) : Int[]
     
     iter = 0
     plateau_count = 0
@@ -199,18 +204,38 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eva
                 
                 # Comptage des couleurs chez les voisins de s
                 fill!(freq_couleurs, 0)
-                for v in adj[s]
-                    col_v = sol_courante[v]
-                    if col_v > 0 && col_v <= max_c
-                        freq_couleurs[col_v] += 1
+                somme_perte_orig = 0
+                if is_pondere
+                    fill!(somme_voisins_ponderee, 0)
+                    for v in adj[s]
+                        col_v = sol_courante[v]
+                        if col_v > 0 && col_v <= max_c
+                            freq_couleurs[col_v] += 1
+                            somme_voisins_ponderee[col_v] += 2 * conflits_par_sommet[v] + 1
+                            if col_v == c_orig
+                                somme_perte_orig += -2 * conflits_par_sommet[v] + 1
+                            end
+                        end
+                    end
+                else
+                    for v in adj[s]
+                        col_v = sol_courante[v]
+                        if col_v > 0 && col_v <= max_c
+                            freq_couleurs[col_v] += 1
+                        end
                     end
                 end
                 conflits_actuels_de_s = freq_couleurs[c_orig]
                 
                 for c in couleurs
                     if c != c_orig
-                        # (conflits créés avec c) - (conflits supprimés de c_orig)
-                        delta = freq_couleurs[c] - conflits_actuels_de_s
+                        if is_pondere
+                            # Variation quadratique sur s et ses voisins : delta de sum (conflits[u])^2
+                            delta = (freq_couleurs[c]^2 - conflits_actuels_de_s^2) + somme_perte_orig + somme_voisins_ponderee[c]
+                        else
+                            # (conflits créés avec c) - (conflits supprimés de c_orig)
+                            delta = freq_couleurs[c] - conflits_actuels_de_s
+                        end
                         
                         if delta < meilleur_delta
                             meilleur_delta = delta
@@ -241,18 +266,43 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eva
             
             # On applique le meilleur mouvement trouvé sur tout le voisinage V_1
             if meilleur_delta < 0
+                c_old = sol_courante[meilleur_s]
                 sol_courante[meilleur_s] = meilleur_c
-                conflits_courant += meilleur_delta
-                plateau_count = 0 # Reset du plateau après une vraie amélioration
+                if is_pondere
+                    for v in adj[meilleur_s]
+                        if sol_courante[v] == c_old
+                            conflits_par_sommet[v] -= 1
+                        elseif sol_courante[v] == meilleur_c
+                            conflits_par_sommet[v] += 1
+                        end
+                    end
+                    conflits_par_sommet[meilleur_s] = count(v -> sol_courante[v] == meilleur_c, adj[meilleur_s])
+                    conflits_courant = nb_conflits(sol_courante, adj)
+                else
+                    conflits_courant += meilleur_delta
+                end
+                plateau_count = 0 # Reset du plateau après une amélioration
                 empty!(sommets_parcourus_plateau)
                 k_vnd = 1 # Reste dans V_1
             elseif mvt_neutre_trouve && plateau_count < max_plateau
                 # Mouvement neutre pour naviguer sur le plateau
+                c_old = sol_courante[sommet_neutre]
                 sol_courante[sommet_neutre] = couleur_neutre
+                if is_pondere
+                    for v in adj[sommet_neutre]
+                        if sol_courante[v] == c_old
+                            conflits_par_sommet[v] -= 1
+                        elseif sol_courante[v] == couleur_neutre
+                            conflits_par_sommet[v] += 1
+                        end
+                    end
+                    conflits_par_sommet[sommet_neutre] = count(v -> sol_courante[v] == couleur_neutre, adj[sommet_neutre])
+                    conflits_courant = nb_conflits(sol_courante, adj)
+                end
                 push!(sommets_parcourus_plateau, sommet_neutre) # On verrouille ce sommet pour ce plateau
                 plateau_count += 1
             else
-                # Bloqué dans V_1 -> on tente le voisinage V_2 (2-color)
+                # Bloqué dans V_1 -> on essaie le voisinage V_2 (2-color)
                 k_vnd = 2
             end
             
@@ -268,6 +318,11 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eva
                 sol_courante[u] = cu
                 sol_courante[v] = cv
                 conflits_courant = nb_conflits(sol_courante, adj)
+                if is_pondere
+                    for node in 1:n
+                        conflits_par_sommet[node] = count(w -> sol_courante[w] == sol_courante[node], adj[node])
+                    end
+                end
                 plateau_count = 0
                 empty!(sommets_parcourus_plateau)
                 k_vnd = 1 # retour au voisinage V_1
@@ -275,6 +330,12 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eva
                 # Mouvement neutre en 2-color pour naviguer sur le plateau (anti-cycle)
                 sol_courante[u] = cu
                 sol_courante[v] = cv
+                conflits_courant = nb_conflits(sol_courante, adj)
+                if is_pondere
+                    for node in 1:n
+                        conflits_par_sommet[node] = count(w -> sol_courante[w] == sol_courante[node], adj[node])
+                    end
+                end
                 push!(sommets_parcourus_plateau, u)
                 push!(sommets_parcourus_plateau, v)
                 plateau_count += 1
@@ -306,7 +367,7 @@ function perturbation(solution, k, couleurs, adj)
         end
     end
     
-    # Si k est supérieur au nombre de conflits, on rajoute des voisins de sommets en conflit
+    # Si k est supérieur au nombre de sommets en conflit, on rajoute des voisins de sommets en conflit
     if length(sommets_choisis) < nb_total
         voisins_disponibles = Int[]
         for s in candidats_conflit
@@ -328,7 +389,7 @@ function perturbation(solution, k, couleurs, adj)
         end
     end
     
-    # si k est encore plus grand, on complète avec n'importe quel sommet du graphe
+    # Si k est encore plus grand, on complète avec des sommets aléatoires du graphe
     while length(sommets_choisis) < nb_total
         push!(sommets_choisis, rand(1:n))
     end
@@ -344,7 +405,7 @@ function perturbation(solution, k, couleurs, adj)
 end
 
 # Recherche à Voisinage Variable (VNS) avec limite de temps (timer)
-function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temps=600, log=true, full_output=false)
+function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temps=600, log=true, full_output=false, type_obj="classique")
     debut = time()
     temps_meilleur = 0.0
     eval_counter = Ref(0)
@@ -389,7 +450,7 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temp
     end
     
     # Descente locale initiale VND (1-color puis 2-color)
-    solution, conflits, utilise_v2 = descente_VND(solution, adj, couleurs; eval_counter=eval_counter)
+    solution, conflits, utilise_v2 = descente_VND(solution, adj, couleurs; eval_counter=eval_counter, type_obj=type_obj)
     desc_init = utilise_v2 ? "V_2" : "V_1"
     if conflits < meilleurs_conflits
         meilleurs_conflits = conflits
@@ -418,7 +479,7 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temp
             sol_prime = perturbation(solution, k, couleurs, adj)
             
             # recherche Locale descente VND (V_1 1-color puis V_2 2-color)
-            sol_seconde, conflits_seconde, utilise_v2 = descente_VND(sol_prime, adj, couleurs; eval_counter=eval_counter)
+            sol_seconde, conflits_seconde, utilise_v2 = descente_VND(sol_prime, adj, couleurs; eval_counter=eval_counter, type_obj=type_obj)
             desc_type = utilise_v2 ? "V_2" : "V_1"
             
             # changement de voisinage
@@ -498,7 +559,7 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temp
                         println("Itération $iter : $seuil_backtrack stagnations (historique vide) -> Diversification / Saut ($meilleurs_conflits conflits)")
                     end
                     solution = perturbation(meilleure_sol, min(n ÷ 2, 80), couleurs, adj)
-                    solution, conflits_courant, _ = descente_VND(solution, adj, couleurs; eval_counter=eval_counter)
+                    solution, conflits_courant, _ = descente_VND(solution, adj, couleurs; eval_counter=eval_counter, type_obj=type_obj)
                     solution_base_branche = copy(solution)
                     conflits_base_branche = conflits_courant
                     empty!(solutions_visitees_plateau)
@@ -521,5 +582,3 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temp
         return meilleure_sol, meilleurs_conflits
     end
 end
-
-

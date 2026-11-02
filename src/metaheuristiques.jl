@@ -1,6 +1,6 @@
 include("voisinages.jl")
 
-function recuit_simule(adj, k, T, heuristique, voisinage, mu; limite_temps = 600, log=false, full_output=false)
+function recuit_simule(A, adj, k, T, heuristique, voisinage, mu; limite_temps = 600, log=false, full_output=false)
     # recuit simulé choix aléatoire voisin dans le voisinage considéré
     # les nombres de conflits sont calculés pour toute la solution à chaque itération, 
     # calculer le cout incremental plutot que le cout total n'ameliore pas le temps de résolution, au contraire, c est un peu plus long
@@ -66,9 +66,6 @@ function recuit_simule(adj, k, T, heuristique, voisinage, mu; limite_temps = 600
         return meilleure_solution, nb_conflit_initial, nb_conflit_min, T, duree_resolution
     end
 end
-
-# Surcharge pour rétro-compatibilité si la matrice A est fournie
-recuit_simule(A, adj, k, T, heuristique, voisinage, mu; kwargs...) = recuit_simule(adj, k, T, heuristique, voisinage, mu; kwargs...)
 
 
 function recherche_tabou(adj, n, k, heuristique, voisinage, len_tabou ; type_obj = "classique", taille_echantillon=5, taille_voisinage=5, n_iter_max_sans_amelioration=2500, n_perturbation_max_sans_amelioration = 3, limite_temps=600, log=false)

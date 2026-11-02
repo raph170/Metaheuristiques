@@ -21,9 +21,12 @@ couleurs = Dict(
 # dsjc1000.9.col.txt 50 -80
 # C2000.5.col.txt 30 
 # c 4000 80
-nom_fichier = "flat300_26_0.col.txt"
-# nom_fichier = "le450_15c.col.txt"
+
+# nom_fichier = "dsjc125.1.col.txt"
+nom_fichier = "le450_15c.col.txt"
 # nom_fichier = "C2000.5.col.txt"
+# nom_fichier = "flat300_26_0.col.txt"
+
 avant_graphe = time()
 A, adj, n, nombre_aretes = lecture_graphe_avec_voisins(dir * "/" * nom_fichier)
 apres_graphe = time()
@@ -34,11 +37,11 @@ k = couleurs[nom_fichier][1]+1
 heuristique = aleatoire
 limite_temps = 120
 
-meta_heuristique = "recherche tabou"
+# meta_heuristique = "recherche tabou"
 # meta_heuristique = "recherche tabou objectif pondéré"
 # meta_heuristique = "recherche tabou range len_tabou"
 # meta_heuristique = "recuit simulé"
-# meta_heuristique = "VNS"
+meta_heuristique = "VNS"
 
 
 #####################
@@ -127,10 +130,9 @@ end
 #######################
 ######### VNS #########
 #######################
-if meta_heuristique == "VND"
-    sol, conflits = VNS(A, k; adj=adj, max_iter=2000, k_max=100, limite_temps=limite_temps)
-    println("Conflits finaux VND : ", conflits)
+if meta_heuristique == "VNS"
+    # type_obj="classique"
+    type_obj="pondere"
+    sol, conflits = VNS(A, k; adj=adj, max_iter=2000, k_max=100, limite_temps=limite_temps, type_obj=type_obj)
+    println("Conflits finaux VNS : ", conflits)
 end
-
-
-

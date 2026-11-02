@@ -121,11 +121,12 @@ Le graphe est formé par le cycle $(1-2-3-4-5-1)$ et de l'arête $(2, 5)$.\\
 Soit la solution courante représentée par le vecteur des couleurs $x_0 = (1, 2, 1, 3, 2)$ :
 \begin{itemize}
     \item Sommet 1 : Bleu ($\mathcal{B}$) \quad $\bullet$ Sommet 2 : Rouge ($\mathcal{R}$) \quad $\bullet$ Sommet 3 : Bleu ($\mathcal{B}$)
-    \item Sommet 4 : Vert ($\mathcal{V}$) \quad $\bullet$ Sommet 5 : Rouge ($\mathcal{R}$)
+    \item Sommet 4 : Vert ($\mathcal{V}$) \quad $\bullet$ Sommet 5 : Rouge ($\mathcal{R}$) \\
 \end{itemize}
-Dans cette solution $x_0$, les sommets 2 et 5 sont tous deux Rouges et reliés par l'arête $(2, 5)$ : il y a donc exactement \textbf{1 conflit initial}.
 
-La figure~\ref{fig:exemple_voisinages} et le tableau~\ref{tab:comparaison_voisinages} illustrent les modifications produites par chacun des voisinages :
+Dans cette solution $x_0$, les sommets 2 et 5 sont tous deux Rouges et reliés par l'arête $(2, 5)$ : il y a donc exactement \textbf{1 conflit initial}.\\
+
+La figure~\ref{fig:exemple_voisinages} et le tableau~\ref{tab:comparaison_voisinages} montrent les modifications produites par chacun des voisinages :
 \begin{enumerate}
     \item \textbf{1-color :} On change la couleur d'un seul sommet. Par exemple, le sommet 2 passe de Rouge à Vert ($2 \to 3$). Le vecteur devient $(1, \mathbf{3}, 1, 3, 2)$, ce qui résout le conflit sur l'arête $(2, 5)$.
     \item \textbf{2-swap :} On permute les couleurs de deux sommets de couleurs distinctes, par exemple le sommet 2 (Rouge) et le sommet 4 (Vert). Le vecteur devient $(1, \mathbf{3}, 1, \mathbf{2}, 2)$. Le conflit sur $(2,5)$ disparaît, mais un nouveau conflit apparaît entre 4 et 5 (tous deux Rouges).
@@ -152,7 +153,7 @@ La figure~\ref{fig:exemple_voisinages} et le tableau~\ref{tab:comparaison_voisin
     \draw (1)--(2)--(3)--(4)--(5)--(1);
     \draw[red, very thick] (2)--(5);
     \node[draw=none, rectangle, below] at (0,-1.4) {\textbf{(a) Initial $x_0$}};
-    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$(1,2,1,3,2)$ [1 conf.]};
+    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$(1,2,1,3,2)$};
   \end{scope}
 
   % (b) 1-color
@@ -165,7 +166,7 @@ La figure~\ref{fig:exemple_voisinages} et le tableau~\ref{tab:comparaison_voisin
     \draw (1b)--(2b)--(3b)--(4b)--(5b)--(1b);
     \draw (2b)--(5b);
     \node[draw=none, rectangle, below] at (0,-1.4) {\textbf{(b) 1-color}};
-    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$2 \to \mathcal{V}$ [0 conf.]};
+    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$2 \to \mathcal{V}$};
   \end{scope}
 
   % (c) 2-swap
@@ -179,7 +180,7 @@ La figure~\ref{fig:exemple_voisinages} et le tableau~\ref{tab:comparaison_voisin
     \draw (2c)--(5c);
     \draw[red, very thick] (4c)--(5c);
     \node[draw=none, rectangle, below] at (0,-1.4) {\textbf{(c) 2-swap}};
-    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$2 \leftrightarrow 4$ [1 conf.]};
+    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$2 \leftrightarrow 4$};
   \end{scope}
 
   % (d) 2-color
@@ -193,7 +194,7 @@ La figure~\ref{fig:exemple_voisinages} et le tableau~\ref{tab:comparaison_voisin
     \draw (2d)--(5d);
     \draw[red, very thick] (1d)--(5d);
     \node[draw=none, rectangle, below] at (0,-1.4) {\textbf{(d) 2-color}};
-    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$2 \to \mathcal{V}, 5 \to \mathcal{B}$ [1 conf.]};
+    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$2 \to \mathcal{V}, 5 \to \mathcal{B}$};
   \end{scope}
 
   % (e) 3-color
@@ -209,7 +210,7 @@ La figure~\ref{fig:exemple_voisinages} et le tableau~\ref{tab:comparaison_voisin
     \draw[red, very thick] (4e)--(5e);
     \draw[red, very thick] (1e)--(5e);
     \node[draw=none, rectangle, below] at (0,-1.4) {\textbf{(e) 3-color}};
-    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$1,2,5$ modifiés [3 conf.]};
+    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$1,2,5$ modifiés};
   \end{scope}
 \end{tikzpicture}
 \caption{Exemple illustratif des 4 structures de voisinages sur un graphe de 5 sommets ($k=3$ couleurs). Les arêtes rouges en gras indiquent les conflits.}
@@ -225,7 +226,7 @@ La figure~\ref{fig:exemple_voisinages} et le tableau~\ref{tab:comparaison_voisin
 \midrule
 Initiale $x_0$       & $(1, 2, 1, 3, 2)$ & 1 & $(2, 2, 1)$ \\
 Voisin 1-color       & $(1, \mathbf{3}, 1, 3, 2)$ & 0 & $(2, 1, 2)$ \\
-Voisin 2-swap        & $(1, \mathbf{3}, 1, \mathbf{2}, 2)$ & 1 & $(2, 2, 1)$ \textit{(invariante)} \\
+Voisin 2-swap        & $(1, \mathbf{3}, 1, \mathbf{2}, 2)$ & 1 & $(2, 2, 1)$ \\
 Voisin 2-color       & $(1, \mathbf{3}, 1, 3, \mathbf{1})$ & 1 & $(3, 0, 2)$ \\
 Voisin 3-color       & $(\mathbf{3}, \mathbf{1}, 1, 3, \mathbf{3})$ & 3 & $(2, 0, 3)$ \\
 \bottomrule
@@ -281,7 +282,7 @@ Pour la recherche locale, on utilise deux structures de voisinages :
 
 Initialement, au lieu d'utiliser la stratégie de type \textit{Best Improvement}, on utilisait la stratégie de type \textit{First Improvement}. C'est-à-dire que le premier résultat qui améliore la solution courante est conservé (on ne poursuit pas la recherche plus loin)\\
 
-\textbf{Évaluation incrémentale du coût ($\Delta$) :}\\
+\textbf{Évaluation du coût ($\Delta$) :}\\
 Pour évaluer rapidement chaque solution voiine sans recalculer tous les conflits du graphe, on utilise le calcul du $\Delta$. Pour un sommet $s$ de couleur actuelle $c_{\text{depart}}$ et pour une nouvelle couleur $c$, la variation du nombre de conflits est :
 \[
 \Delta = \text{freq}[c] - \text{freq}[c_{\text{depart}}]
@@ -381,6 +382,19 @@ On ajoute donc en quelque sorte une recherche à voisinage variable au sein de n
     \item \textbf{nombre de changements effectuées lors des phases de perturbations forcées : } Le nombre de changements effectués est initialisé à 5 et augmente par incrément de 5 après un certain nombre de perturbations forcées sans amélioration. Un seuil est également fixé à 30.
 \end{itemize}
 
+\section{Fonction objectif alternative}
+Jusqu'à présent, la fonction objectif utilisée correspondait au nombre de conflits de la solution considérée. Avec cette fonction objectif, une solution avec 5 sommets ayant 1 conflit chacun a le même coût qu'une solution avec 1 sommet ayant 5 conflits.
+Pour pénaliser davantage les solutions avec des sommets incidents à un grand nombre d'arêtes conflictuelles, nous proposons une fonction objectif alternative : 
+$V_{solution} = sum_{u \in [\![1; n]\!]}(C(u)^2)$ où $C(u)$ désigne le nombre de conflits du sommet $u$.
+
+\textbf{Remarque : } \textit{Avec cette nouvelle fonction objectif, chaque arête uv en conflit est comptée 2 fois, la première lors du calcul de $C(u)^2$, la deuxième lors du calcul de $C(v)^2$ }
+
+En reprenant l'exemple précédent, une solution avec 5 sommets ayant 1 conflit a un nouveau coût de $10*1^2 = 10$ et celle avec 1 sommet ayant 5 conflits à un nouveau coût de $5^2 + 5*1^2 = 30$
+
+La mis à jour incrémental des coût lors de l'exploration d'une solution voisine est donc légèrement plus compliquée avec la fonction objectif alternative.
+Lors du changement de couleur d'un sommet u, il faut en effet considérée le coût de changement pour le sommet u : $\delta_1 = C[u,c_2]^2 - C[u,c_1]^2$ où $C[u,c_1]$ désigne le nombre de voisins de u de couleur c_1, c_1 etant l'ancienne couleur de u et c_2 la couleur associée à la solution voisine.
+Mais il faut également considéré le coût de changement pour tous les sommets v adjacents à u : 
+$\delta_2 = \sum_{v \in N(u)}(c_{\text{apres}}[v] - c_{\text{avant}}[v])$ où $c_{apres}[v]$ vaut le nombre d'arêtes conflictuelles incidentes à v après le changement de couleur et $c_{avant}[v]$ le nombre d'arêtes conflictuelles incidentes à v avant le changement de couleur.
 
 \section{Résultats}
 
@@ -586,11 +600,12 @@ L'analyse de ces résultats met en évidence des comportements différents selon
         \item Sur \texttt{dsjc125.1} et \texttt{dsjc125.9}, elle trouve une solution optimale sans conflit en seulement \textbf{0.1 seconde}.
         \item Sur \texttt{dsjc250.5}, \texttt{dsjc250.9} et la très grande instance \texttt{C4000.5}, elle est plus efficace que la recherche tabou en obtenant un nombre de conflits inférieur.
     \end{itemize}
-    Cette efficacité est due à l'utilisation de DSATUR pour l'initialisation, et du voisinage $V_2$ qui permet de débloquer les minima locaux du 1-changement, et du mécanisme de backtracking qui évite de stagner indéfiniment dans une même vallée.
+    Cette efficacité est due à l'utilisation de DSATUR pour l'initialisation, et du voisinage $V_2$ qui permet de débloquer les minima locaux du 1-changement, et du mécanisme de backtracking qui évite de stagner indéfiniment dans une même vallée.\\
 \end{itemize}
+
+On remarque que l'algorithme Tabou visite beaucoup moins de solutions que le GVNS, alors qu'il est plus efficace. Effectivement, Tabou utilise un échantillonnage restreint pour limiter le coût de mise à jour des tables, tandis que la descente VND de GVNS balaie absolument tous les sommets en conflit afin converger vers un minimum local avant chaque phase de perturbation.
 
 \subsection{Conclusion et perspectives}
 En conclusion, DSATUR et une recherche à voisinages variables (VND / VNS) permet une convergence rapide sur de petites instances (ou à faible densité). Mais pour les grands graphes ($n \ge 1000$) ou les graphes avec des sommets très contraints (densité importante), la recherche tabou semble plus efficace.
 
---> perspective d'amélioration :  initialiser la recherche tabou avec une version randomisée de DSATUR (tirer au sort parmi les 3 sommets les plus saturés ou parmi les meilleures couleurs disponibles par exemple)
 \end{document}
