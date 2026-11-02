@@ -10,13 +10,13 @@ Le code est décomposé en plusieurs fichiers julia :
 
 **Dossier principal :**
 - test.jl :Pour réaliser des tests automatisés de toutes les métaheuristiques sur les instances
-# Usage :
+##### Usage :
 - julia test.jl          -> Exécute avec le temps par défaut (600s = 10 minutes par algo)
 - julia test.jl 30       -> Exécute avec 30s par algo pour un test rapide
 - julia test.jl 30 3     -> Exécute avec 30s par algo, 3 runs pour min/moy/max réel
 
 
-## Lancement d'un résolution
+## Lancement d'une résolution
 Pour lancer une résolution, il suffit de sélectionner le nom du fichier (ie du graphe) et le nombre de couleurs dans le fichier main.jl. Il faut également sélectionner la métaheuristique choisie pour la résolution ainsi que le type de fonction objectif.
 
 D'autres paramètres comme le temps limite de résolution ou l'heuristique choisie pour déterminer la solution initiale peuvent également être modifiés.
@@ -25,19 +25,19 @@ Enfin certains arguments propres à chaque métaheuristique peuvent être modifi
 
 Voici un exemple de quelques paramètres choisis : 
 
-# Choix du graphe (a selectionner)
+#### Choix du graphe (a selectionner)
 nom_fichier = "dsjc125.1.col.txt"
 
-# CHoix du nombre de couleurs (a selectionner) :
+#### Choix du nombre de couleurs (a selectionner) :
 k = couleurs[nom_fichier][1]+1
 
-# Choix de l'heuristique pour la solution initiale (a selectionner)
+#### Choix de l'heuristique pour la solution initiale (a selectionner)
 heuristique = aleatoire
 
-# Limite de temps (a selectionner)
+#### Limite de temps (a selectionner)
 limite_temps = 120
 
-# Choix de la méthode de résolution (a selectionner) :
+#### Choix de la méthode de résolution (a selectionner) :
 meta_heuristique = "recherche tabou"
 
-Il suffit ensuite de lancer l'exécution.
+Il suffit ensuite de lancer l'exécution du fichier main.jl
