@@ -1,57 +1,43 @@
-## 1. Heuristique dédiée pour trouver une $k$-coloration des sommets de $G$
- - Soit la liste des couleurs `C`
- - On classe les sommets de $G$ par ordre décroissant des degrés (test avec random aussi)
- - Pour chacun des sommets de $G$ (dans l'ordre croissant définit précédemment) : 
-    + on attibue au sommet courant $s$ la couleur de `C` qui est le plus utiliée parmis celles disponibles (c'est-à-dire qu'aucun des sommets voisins de $s$ ne sont de cette couleur) (tester avec "moins utilisées" et "aléatoire" aussi)
- - On s'arrête si aucune couleur n'est disponible pour colorier le sommet courant ou si tous les sommets sont coloriés
+## Architecture globale
+Le code est décomposé en plusieurs fichiers julia : 
+**Dossier src :**
+- main.jl : fichier principal pour lancer les résolutions en choisissant la méthode souhaitée.
+- metaheuristiques.jl et VND_VNS.jl : contient les fonctions des différentes métaheuristiques utilisées : recuit simulé, recherche tabou, VND/VNS.
+- heuristiques.jl : contient les fonctions des différentes heuristiques utilisées (aléatoire, glouton, glouton par degrès croissants, Dsatur)
+- voisinages.jl : contient les fonctions permettant de déterminer les différents voisinages d'une solution. Soit l'ensemble complet, soit un seul voisin.
+- solution.jl : Pour gérer les conflits d'une solution, notamment le calcul des 2 fonctions objectifs : nombre de conflits et nombre de conflits pondérés.
+- data.jl : pour lire les instances.
 
-La complexité est $O(n^2 * C)$ où n est le nombre de sommets et C le nombre de couleurs.
-
-## 2. Structures de voisinage adaptées au problème
-
- - Voisinage où on échange les couleurs de deux sommets (*2-swap*) : pas une bonne idée car avec ce voisinage, le nombre de somments de la couleur i ne varie pas, ce qui peut être problématique
- - Voisinage où on change la couleur de $k$ sommets (*k-color*)
-
-**Exemple :** Soit la solution courante $x=(1, 3, 2)$ pour les couleurs $c=(1, 2, 3)$
- - le voisinage *2-swap* est $V_{2s}(x) = \{(3, 1, 2), (2, 3, 1), (1, 2, 3)\}$
- - le voisinage *1-color* est $V_{1c}(x) = \{(2, 3, 2), (3, 3, 2), (1, 1, 2), (1, 2, 2), (1, 3, 1), (1, 3, 3)\}$
- - le voisinage *2-color* est $V_{2c}(x) = \{(2, 1, 1), (2, 1, 3), (2, 2, 1), (2, 2, 3), (3, 1, 1), (3, 1, 3), (3, 2, 1), (3, 2, 3)\}$
-
-## 3. Pistes pour une heuristique plus poussée
-
-Pour aller plus loin que le simple tri par degré décroissant :
-
-- **DSATUR (Degré de saturation) :**
-  - Au lieu d'un tri statique au début, on choisit dynamiquement à chaque étape le sommet qui a le plus de couleurs différentes déjà utilisées par ses voisins
-
-- **à tester :**
-  - Heuristique qui favorise les cliques de taille maximale : on sélectionne une clique, puis une deuxième dans le graphe restant, ...
-
-## 4. Métaheuristiques de k-colorations
-
-### A. Recherche à Voisinage Variable (VNS)
-*(Très simple à mettre en place avec les voisinages déjà codés)*
-
-### B. Recherche Tabou
-- **Objectif :** minimiser le nombre d'arêtes en conflit pour un nombre fixé de couleurs.
-- **Voisinage en conflits :** on ne teste que les sommets qui ont au moins un voisin de même couleur. On applique la transformation *1-color*.
-- **Tabou :**
-  - Si on passe le sommet $s$ de la couleur $c_1$ à $c_2$, le couple $(s, c_1)$ devient "tabou" pendant $T$ itérations (T optimal à définir --> aléatoire ? dynamique ?).
-
-### C. Algorithme Génétique
-- **Population :** un ensemble de colorations dans lequel on essaie de mpinimiser le nombre de conflits
-- **Mutation :**
-  - On modifier aléatoirement la couleur de sommets en conflit (voisin *1-color* ou *2-color*).
+**Dossier principal :**
+- test.jl :Pour réaliser des tests automatisés de toutes les métaheuristiques sur les instances
+##### Usage :
+- julia test.jl          -> Exécute avec le temps par défaut (600s = 10 minutes par algo)
+- julia test.jl 30       -> Exécute avec 30s par algo pour un test rapide
+- julia test.jl 30 3     -> Exécute avec 30s par algo, 3 runs pour min/moy/max réel
 
 
-## 5. Pistes :
+## Lancement d'une résolution
+Pour lancer une résolution, il suffit de sélectionner le nom du fichier (ie du graphe) et le nombre de couleurs dans le fichier main.jl. Il faut également sélectionner la métaheuristique choisie pour la résolution ainsi que le type de fonction objectif.
 
-- Utiliser DSATUR dans la Recherche Tabou :
-  - **Situation actuelle :** Tabou démarre d'une solution aléatoire. C'est un choix qui permet de maximiser la diversité initiale et d'éviter d'enfermer la recherche dans un biais heuristique (une cuvette dans laquelle le minimum total ne se trouve pas forcément).
-  - **Intérêt sur les grands graphes ($n \ge 1000$) :** Sur des instances denses comme `dsjc1000.5` ou `dsjc1000.9`, une initialisation aléatoire commence avec 2000 à 3000 conflits, ce qui oblige l'algorithme à passer plusieurs minutes rien que pour faire le tri initial. DSATUR commence directement autour de 350-450 conflits, ce qui offrirait potentiellement un gain de temps considérable. DSATUR classique est déterministe, Tabou démarrerait toujours de la même solution et explorerait toujours la même vallée lors des redémarrages. Pour l'intégrer efficacement, il faudrait utiliser un **DSATUR randomisé** (ex. tirer au sort parmi les 3 sommets les plus saturés ou parmi les meilleures couleurs disponibles).
+D'autres paramètres comme le temps limite de résolution ou l'heuristique choisie pour déterminer la solution initiale peuvent également être modifiés.
 
-- pour un graphe dense (p>=0.6 par exemple), on choisi un échantillnage aléatoire des commets en conflits pour les paires de V_2
+Enfin certains arguments propres à chaque métaheuristique peuvent être modifiés lors de l'appel à ces fonctions (log : true/false, température T pour le recuit simulé, len_tabou pour la recherche tabou, k_max pour la VNS,...)
 
-- **Fonction objectif pondérée (pénalisation des sommets très conflictuels) :**
-  - Disponible via le paramètre `type_obj = "pondéré"` dans la Recherche Tabou et dans la descente VND / VNS.
-  - Au lieu de minimiser uniquement le nombre d'arêtes en conflit, on minimise la somme des carrés $\sum_{u \in V} (\text{conflits}[u])^2$. Cela pénalise beaucoup plus fort les sommets très contraints et guide la recherche vers une résolution qui priorise les nœuds les plus contraints.
+Voici un exemple de quelques paramètres choisis : 
+
+#### Choix du graphe (a selectionner)
+nom_fichier = "dsjc125.1.col.txt"
+
+#### Choix du nombre de couleurs (a selectionner) :
+k = couleurs[nom_fichier][1]+1
+
+#### Choix de l'heuristique pour la solution initiale (a selectionner)
+heuristique = aleatoire
+
+#### Limite de temps (a selectionner)
+limite_temps = 120
+
+#### Choix de la méthode de résolution (a selectionner) :
+meta_heuristique = "recherche tabou"
+
+Il suffit ensuite de lancer l'exécution du fichier main.jl

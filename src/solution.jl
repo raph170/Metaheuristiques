@@ -17,6 +17,7 @@ function objectif_pondere(solution, adj)
 end
 
 function increment_n_conflit(A, adj, solution, avant_changements)
+    # finalement pas utilisée
     nb_conflit_initial = 0
     nb_conflit_final = 0
     for u in keys(avant_changements) # memes sommets pour avant et apres, seules les valeurs du dictionnaire (couleurs) changent
