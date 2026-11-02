@@ -90,7 +90,7 @@ function recherche_tabou(adj, n, k, heuristique, voisinage, len_tabou ; type_obj
     # Nombre total de conflits
     if type_obj == "classique"
         nb_conflit = sum(conflits) ÷ 2
-    elseif type_obj == "pondéré"
+    elseif type_obj == "pondere"
         nb_conflit_reel = sum(conflits) ÷ 2
         nb_conflit = sum([conflits[u]^2 for u in 1:n]) # fonction objectif pour pénaliser les sommets ayant un grand nombre de conflits
     else

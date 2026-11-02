@@ -18,10 +18,11 @@ using Printf
 dir = "data/graphs"
 
 # Temps limite par algorithme et par instance (en secondes)
-# 600 secondes = 10 minutes
 const TEMPS_PAR_DEFAUT = 600.0
 limite_temps = length(ARGS) >= 1 ? parse(Float64, ARGS[1]) : TEMPS_PAR_DEFAUT
 nb_runs      = length(ARGS) >= 2 ? parse(Int, ARGS[2])     : 1
+
+tester_recuit = false # Mettre à true pour inclure également le recuit simulé
 
 println("=" ^ 90)
 println("   BENCHMARK GLOBAL DES MÉTAHEURISTIQUES (k-COLORATION)")
@@ -59,12 +60,12 @@ instances = [
 ]
 
 # Fichiers de sortie
-csv_global   = "resultats_benchmark.csv"
-csv_detail   = "resultats_detailles.csv"
+csv_global = "resultats_benchmark_bis.csv"
+csv_detail = "resultats_detailles_bis.csv"
 
 # Initialisation du CSV global
 open(csv_global, "w") do f
-    println(f, "Instance,Sommets,Aretes,k,DSATUR_Conflits,Recuit_Conflits,Recuit_Temps,Tabou_Conflits,Tabou_Temps,VND_Conflits,VND_Temps")
+    println(f, "Instance,Sommets,Aretes,k,DSATUR_Conflits,Tabou_Std_Conflits,Tabou_Std_Temps,Tabou_Carre_Conflits,Tabou_Carre_Temps,VNS_Std_Conflits,VNS_Std_Temps,VNS_Carre_Conflits,VNS_Carre_Temps")
 end
 
 # Initialisation du CSV détaillé
@@ -79,16 +80,16 @@ tab_descente = []
 tab_recuit  = []
 
 println("\nProgression du benchmark :\n")
-@printf("%-16s | %-4s | %-7s | %-3s | %-6s | %-13s | %-13s | %-13s\n", 
-        "Instance", "n", "m", "k", "DSATUR", "Recuit Simulé", "Rech. Tabou", "GVNS / VND")
-println("-" ^ 95)
+@printf("%-16s | %-4s | %-7s | %-3s | %-6s | %-15s | %-15s | %-15s | %-15s\n", 
+        "Instance", "n", "m", "k", "DSATUR", "Tabou (std)", "Tabou (carré)", "VNS (std)", "VNS (carré)")
+println("-" ^ 120)
 
 for (nom, k) in instances
     chemin = joinpath(dir, nom)
     A, adj, n, m = lecture_graphe_avec_voisins(chemin)
     nom_court = replace(basename(nom), ".col.txt" => "", ".col" => "")
 
-    # 1. Heuristique initiale DSATUR
+    # 1. Heuristique initiale DSATUR (Déterministe)
     t0_dsatur = time()
     sol_dsatur = dsatur(adj, k)
     c_dsatur = nb_conflits(sol_dsatur, adj)
@@ -99,119 +100,169 @@ for (nom, k) in instances
     sol_desc, c_desc, _ = descente_VND(copy(sol_dsatur), adj, collect(1:k); max_plateau=0)
     dur_desc = time() - t0_desc
     vit_desc = round(Int, (length(sol_desc) * (k - 1)) / max(dur_desc, 1e-5))
-    # Méthode déterministe : min = moy = max = c_desc
-    push!(tab_descente, (nom_court, c_dsatur, c_desc, round(dur_desc; digits=2), round(dur_desc; digits=2), vit_desc))
 
-    # 3. Recuit Simulé (Stochastique, répété nb_runs fois)
-    scores_rs = Int[]
-    dur_rs_tot = 0.0
-    t_best_rs_tot = 0.0
-    vit_rs_tot = 0.0
+    # 3. Recherche Tabou - Objectif Classique
+    scores_tab_std = Int[]
+    dur_tab_std_tot = 0.0
+    t_best_tab_std_tot = 0.0
+    vit_tab_std_tot = 0.0
     for r in 1:nb_runs
-        _, _, c_fin, _, dur, t_best, vit = recuit_simule(
-            A, adj, k, 200, aleatoire, _1_echange, 0.99;
-            limite_temps=limite_temps, log=false, full_output=true
-        )
-        push!(scores_rs, c_fin)
-        dur_rs_tot += dur
-        t_best_rs_tot += t_best
-        vit_rs_tot += vit
-    end
-    c_rs_min = minimum(scores_rs)
-    c_rs_moy = round(sum(scores_rs) / length(scores_rs); digits=1)
-    c_rs_max = maximum(scores_rs)
-    dur_rs   = round(dur_rs_tot / nb_runs; digits=1)
-    t_best_rs = round(t_best_rs_tot / nb_runs; digits=2)
-    vit_rs   = round(Int, vit_rs_tot / nb_runs)
-    push!(tab_recuit, (nom_court, c_rs_min, c_rs_moy, c_rs_max, dur_rs, t_best_rs, vit_rs))
-
-    # 4. Recherche Tabou (Stochastique, répétée nb_runs fois)
-    densite = 2 * m / (n * (n - 1))
-    i_dens = n <= 250 ? 1 : n <= 500 ? 2 : n <= 1000 ? 3 : n <= 2000 ? 4 : 5
-    j_dens = densite <= 0.2 ? 1 : densite <= 0.6 ? 2 : 3
-    len_tabou = [
-        10 20 30
-        30 40 50
-        40 60 80
-        50 70 90
-        100 100 100
-    ][i_dens, j_dens]
-
-    scores_tab = Int[]
-    dur_tab_tot = 0.0
-    t_best_tab_tot = 0.0
-    vit_tab_tot = 0.0
-    for r in 1:nb_runs
-        _, _, c_fin, dur, t_best, vit = recherche_tabou(
-            A, adj, n, k, aleatoire, _p_echange, len_tabou;
+        sol, _, c_fin, dur, t_best, vit = recherche_tabou(
+            adj, n, k, aleatoire, _p_echange, nothing;
+            type_obj="classique",
             taille_echantillon=20, taille_voisinage=5,
-            n_iter_max_sans_amelioration=2500, n_perturbation_max_sans_amelioration=5,
+            n_iter_max_sans_amelioration=10000, n_perturbation_max_sans_amelioration=3,
             limite_temps=limite_temps, log=false
         )
-        push!(scores_tab, c_fin)
-        dur_tab_tot += dur
-        t_best_tab_tot += t_best
-        vit_tab_tot += vit
+        push!(scores_tab_std, c_fin)
+        dur_tab_std_tot += dur
+        t_best_tab_std_tot += t_best
+        vit_tab_std_tot += vit
     end
-    c_tab_min = minimum(scores_tab)
-    c_tab_moy = round(sum(scores_tab) / length(scores_tab); digits=1)
-    c_tab_max = maximum(scores_tab)
-    dur_tab   = round(dur_tab_tot / nb_runs; digits=1)
-    t_best_tab = round(t_best_tab_tot / nb_runs; digits=1)
-    vit_tab   = round(Int, vit_tab_tot / nb_runs)
-    push!(tab_tabou, (nom_court, c_tab_min, c_tab_moy, c_tab_max, dur_tab, t_best_tab, vit_tab))
+    c_tab_std_min = minimum(scores_tab_std)
+    c_tab_std_moy = round(sum(scores_tab_std) / length(scores_tab_std); digits=1)
+    c_tab_std_max = maximum(scores_tab_std)
+    dur_tab_std   = round(dur_tab_std_tot / nb_runs; digits=1)
+    t_best_tab_std = round(t_best_tab_std_tot / nb_runs; digits=1)
+    vit_tab_std   = round(Int, vit_tab_std_tot / nb_runs)
 
-    # 5. GVNS / VND (Stochastique lors des secousses)
-    scores_vnd = Int[]
-    dur_vnd_tot = 0.0
-    t_best_vnd_tot = 0.0
-    vit_vnd_tot = 0.0
+    # 4. Recherche Tabou - Objectif Carré
+    scores_tab_carre = Int[]
+    dur_tab_carre_tot = 0.0
+    t_best_tab_carre_tot = 0.0
+    vit_tab_carre_tot = 0.0
+    for r in 1:nb_runs
+        sol, _, _, dur, t_best, vit = recherche_tabou(
+            adj, n, k, aleatoire, _p_echange, nothing;
+            type_obj="pondéré",
+            taille_echantillon=20, taille_voisinage=5,
+            n_iter_max_sans_amelioration=10000, n_perturbation_max_sans_amelioration=3,
+            limite_temps=limite_temps, log=false
+        )
+        c_reel = nb_conflits(sol, adj)
+        push!(scores_tab_carre, c_reel)
+        dur_tab_carre_tot += dur
+        t_best_tab_carre_tot += t_best
+        vit_tab_carre_tot += vit
+    end
+    c_tab_carre_min = minimum(scores_tab_carre)
+    c_tab_carre_moy = round(sum(scores_tab_carre) / length(scores_tab_carre); digits=1)
+    c_tab_carre_max = maximum(scores_tab_carre)
+    dur_tab_carre   = round(dur_tab_carre_tot / nb_runs; digits=1)
+    t_best_tab_carre = round(t_best_tab_carre_tot / nb_runs; digits=1)
+    vit_tab_carre   = round(Int, vit_tab_carre_tot / nb_runs)
+
+    # 5. GVNS / VND - Objectif Classique
+    scores_vnd_std = Int[]
+    dur_vnd_std_tot = 0.0
+    t_best_vnd_std_tot = 0.0
+    vit_vnd_std_tot = 0.0
     for r in 1:nb_runs
         _, _, c_fin, dur, t_best, vit = VNS(
-            A, k; adj=adj, max_iter=100000, k_max=50,
-            limite_temps=limite_temps, log=false, full_output=true
+            A, k; adj=adj, max_iter=100000, k_max=100,
+            limite_temps=limite_temps, log=false, full_output=true, type_obj="classique"
         )
-        push!(scores_vnd, c_fin)
-        dur_vnd_tot += dur
-        t_best_vnd_tot += t_best
-        vit_vnd_tot += vit
-        # Si 0 conflit est atteint dès la descente initiale déterministe, les runs suivants seront identiques
+        push!(scores_vnd_std, c_fin)
+        dur_vnd_std_tot += dur
+        t_best_vnd_std_tot += t_best
+        vit_vnd_std_tot += vit
+        # Si 0 conflit atteint dès la descente déterministe
         if c_fin == 0 && t_best < 0.5
             for _ in (r+1):nb_runs
-                push!(scores_vnd, 0)
-                dur_vnd_tot += dur
-                t_best_vnd_tot += t_best
-                vit_vnd_tot += vit
+                push!(scores_vnd_std, 0)
+                dur_vnd_std_tot += dur
+                t_best_vnd_std_tot += t_best
+                vit_vnd_std_tot += vit
             end
             break
         end
     end
-    c_vnd_min = minimum(scores_vnd)
-    c_vnd_moy = round(sum(scores_vnd) / length(scores_vnd); digits=1)
-    c_vnd_max = maximum(scores_vnd)
-    dur_vnd   = round(dur_vnd_tot / length(scores_vnd); digits=1)
-    t_best_vnd = round(t_best_vnd_tot / length(scores_vnd); digits=1)
-    vit_vnd   = round(Int, vit_vnd_tot / length(scores_vnd))
-    push!(tab_vns, (nom_court, c_vnd_min, c_vnd_moy, c_vnd_max, dur_vnd, t_best_vnd, vit_vnd))
+    c_vnd_std_min = minimum(scores_vnd_std)
+    c_vnd_std_moy = round(sum(scores_vnd_std) / length(scores_vnd_std); digits=1)
+    c_vnd_std_max = maximum(scores_vnd_std)
+    dur_vnd_std   = round(dur_vnd_std_tot / length(scores_vnd_std); digits=1)
+    t_best_vnd_std = round(t_best_vnd_std_tot / length(scores_vnd_std); digits=1)
+    vit_vnd_std   = round(Int, vit_vnd_std_tot / length(scores_vnd_std))
+
+    # 6. GVNS / VND - Objectif Carré
+    scores_vnd_carre = Int[]
+    dur_vnd_carre_tot = 0.0
+    t_best_vnd_carre_tot = 0.0
+    vit_vnd_carre_tot = 0.0
+    for r in 1:nb_runs
+        _, _, c_fin, dur, t_best, vit = VNS(
+            A, k; adj=adj, max_iter=100000, k_max=100,
+            limite_temps=limite_temps, log=false, full_output=true, type_obj="pondéré"
+        )
+        push!(scores_vnd_carre, c_fin)
+        dur_vnd_carre_tot += dur
+        t_best_vnd_carre_tot += t_best
+        vit_vnd_carre_tot += vit
+        if c_fin == 0 && t_best < 0.5
+            for _ in (r+1):nb_runs
+                push!(scores_vnd_carre, 0)
+                dur_vnd_carre_tot += dur
+                t_best_vnd_carre_tot += t_best
+                vit_vnd_carre_tot += vit
+            end
+            break
+        end
+    end
+    c_vnd_carre_min = minimum(scores_vnd_carre)
+    c_vnd_carre_moy = round(sum(scores_vnd_carre) / length(scores_vnd_carre); digits=1)
+    c_vnd_carre_max = maximum(scores_vnd_carre)
+    dur_vnd_carre   = round(dur_vnd_carre_tot / length(scores_vnd_carre); digits=1)
+    t_best_vnd_carre = round(t_best_vnd_carre_tot / length(scores_vnd_carre); digits=1)
+    vit_vnd_carre   = round(Int, vit_vnd_carre_tot / length(scores_vnd_carre))
+
+    # 7. Recuit Simulé (Optionnel si tester_recuit=true)
+    if tester_recuit
+        scores_rs = Int[]
+        dur_rs_tot = 0.0
+        t_best_rs_tot = 0.0
+        vit_rs_tot = 0.0
+        for r in 1:nb_runs
+            _, _, c_fin, _, dur, t_best, vit = recuit_simule(
+                A, adj, k, 200, aleatoire, _1_echange, 0.99;
+                limite_temps=limite_temps, log=false, full_output=true
+            )
+            push!(scores_rs, c_fin)
+            dur_rs_tot += dur
+            t_best_rs_tot += t_best
+            vit_rs_tot += vit
+        end
+        c_rs_min = minimum(scores_rs)
+        c_rs_moy = round(sum(scores_rs) / length(scores_rs); digits=1)
+        c_rs_max = maximum(scores_rs)
+        dur_rs   = round(dur_rs_tot / nb_runs; digits=1)
+        t_best_rs = round(t_best_rs_tot / nb_runs; digits=2)
+        vit_rs   = round(Int, vit_rs_tot / nb_runs)
+    end
 
     # Affichage console en temps réel
-    @printf("%-16s | %-4d | %-7d | %-3d | %-6d | %-4d (%4.1fs) | %-4d (%4.1fs) | %-4d (%4.1fs)\n", 
+    @printf("%-16s | %-4d | %-7d | %-3d | %-6d | %-4d (%4.1fs) | %-4d (%4.1fs) | %-4d (%4.1fs) | %-4d (%4.1fs)\n", 
             nom_court, n, m, k, c_dsatur, 
-            c_rs_min, dur_rs, 
-            c_tab_min, dur_tab, 
-            c_vnd_min, dur_vnd)
+            c_tab_std_min, dur_tab_std,
+            c_tab_carre_min, dur_tab_carre,
+            c_vnd_std_min, dur_vnd_std,
+            c_vnd_carre_min, dur_vnd_carre)
 
     # Sauvegarde CSV global
     open(csv_global, "a") do f
-        println(f, "$nom_court,$n,$m,$k,$c_dsatur,$c_rs_min,$dur_rs,$c_tab_min,$dur_tab,$c_vnd_min,$dur_vnd")
+        println(f, "$nom_court,$n,$m,$k,$c_dsatur,$c_tab_std_min,$dur_tab_std,$c_tab_carre_min,$dur_tab_carre,$c_vnd_std_min,$dur_vnd_std,$c_vnd_carre_min,$dur_vnd_carre")
     end
 
-    # Sauvegarde CSV détaillé (une ligne par algo)
+    # Sauvegarde CSV détaillé (une ligne par algorithme et variante d'objectif)
     open(csv_detail, "a") do f
+        println(f, "$nom_court,$n,$m,$k,DSATUR,$c_dsatur,$c_dsatur,$c_dsatur,$(round(dur_dsatur; digits=2)),$(round(dur_dsatur; digits=2)),0")
         println(f, "$nom_court,$n,$m,$k,Descente_V1,$c_desc,$c_desc,$c_desc,$(round(dur_desc; digits=2)),$(round(dur_desc; digits=2)),$vit_desc")
-        println(f, "$nom_court,$n,$m,$k,Recuit_Simule,$c_rs_min,$c_rs_moy,$c_rs_max,$dur_rs,$t_best_rs,$vit_rs")
-        println(f, "$nom_court,$n,$m,$k,Recherche_Tabou,$c_tab_min,$c_tab_moy,$c_tab_max,$dur_tab,$t_best_tab,$vit_tab")
-        println(f, "$nom_court,$n,$m,$k,GVNS_VND,$c_vnd_min,$c_vnd_moy,$c_vnd_max,$dur_vnd,$t_best_vnd,$vit_vnd")
+        println(f, "$nom_court,$n,$m,$k,Tabou_Classique,$c_tab_std_min,$c_tab_std_moy,$c_tab_std_max,$dur_tab_std,$t_best_tab_std,$vit_tab_std")
+        println(f, "$nom_court,$n,$m,$k,Tabou_Carre,$c_tab_carre_min,$c_tab_carre_moy,$c_tab_carre_max,$dur_tab_carre,$t_best_tab_carre,$vit_tab_carre")
+        println(f, "$nom_court,$n,$m,$k,GVNS_VND_Classique,$c_vnd_std_min,$c_vnd_std_moy,$c_vnd_std_max,$dur_vnd_std,$t_best_vnd_std,$vit_vnd_std")
+        println(f, "$nom_court,$n,$m,$k,GVNS_VND_Carre,$c_vnd_carre_min,$c_vnd_carre_moy,$c_vnd_carre_max,$dur_vnd_carre,$t_best_vnd_carre,$vit_vnd_carre")
+        if tester_recuit
+            println(f, "$nom_court,$n,$m,$k,Recuit_Simule,$c_rs_min,$c_rs_moy,$c_rs_max,$dur_rs,$t_best_rs,$vit_rs")
+        end
     end
 end
 
