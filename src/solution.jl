@@ -12,14 +12,8 @@ function nb_conflits(solution, adj::Vector{Vector{Int}})
 end
 
 function objectif_pondere(solution, adj)
-    # C[u,c] = nombre de voisins de u de couleur c
-    C = zeros(Int, n, k)
-    for u in 1:n
-        for v in adj[u]
-            C[u, solution[v]] += 1
-        end
-    end
-    return sum([C[u, solution[u]]^2 for u in 1:n])
+    n = length(solution)
+    return sum(count(v -> solution[v] == solution[u], adj[u])^2 for u in 1:n)
 end
 
 function increment_n_conflit(A, adj, solution, avant_changements)

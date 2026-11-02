@@ -133,6 +133,11 @@ end
 if meta_heuristique == "VNS"
     # type_obj="classique"
     type_obj="pondere"
-    sol, conflits = VNS(A, k; adj=adj, max_iter=2000, k_max=100, limite_temps=limite_temps, type_obj=type_obj)
-    println("Conflits finaux VNS : ", conflits)
+    sol, score_final = VNS(A, k; adj=adj, max_iter=2000, k_max=100, limite_temps=limite_temps, type_obj=type_obj)
+    if type_obj == "pondere"
+        println("Valeur objectif pondérée finale : ", score_final)
+        println("Nombre de conflits réels : ", nb_conflits(sol, adj))
+    else
+        println("Conflits finaux VNS : ", score_final)
+    end
 end

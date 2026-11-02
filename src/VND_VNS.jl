@@ -158,13 +158,13 @@ end
 # Descente à Voisinage Variable (VND) : V_1 (1-color) puis V_2 (2-color)
 function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eval_counter=nothing, type_obj="classique")
     sol_courante = copy(solution)
-    conflits_courant = nb_conflits(sol_courante, adj)
     max_c = maximum(couleurs)
     n = length(sol_courante)
     
     is_pondere = (type_obj == "pondere")
     conflits_par_sommet = is_pondere ? [count(v -> sol_courante[v] == sol_courante[u], adj[u]) for u in 1:n] : Int[]
     somme_voisins_ponderee = is_pondere ? zeros(Int, max_c) : Int[]
+    score_courant = is_pondere ? sum(conflits_par_sommet[u]^2 for u in 1:n) : nb_conflits(sol_courante, adj)
     
     iter = 0
     plateau_count = 0
@@ -174,7 +174,7 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eva
     k_vnd = 1 # Ordre du voisinage de descente : 1 = 1-color, 2 = 2-color
     a_utilise_v2 = false
     
-    while conflits_courant > 0 && iter < max_iter
+    while score_courant > 0 && iter < max_iter
         iter += 1
         
         # On teste les sommets qui posent un problème
@@ -277,9 +277,9 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eva
                         end
                     end
                     conflits_par_sommet[meilleur_s] = count(v -> sol_courante[v] == meilleur_c, adj[meilleur_s])
-                    conflits_courant = nb_conflits(sol_courante, adj)
+                    score_courant = sum(conflits_par_sommet[u]^2 for u in 1:n)
                 else
-                    conflits_courant += meilleur_delta
+                    score_courant += meilleur_delta
                 end
                 plateau_count = 0 # Reset du plateau après une amélioration
                 empty!(sommets_parcourus_plateau)
@@ -297,7 +297,7 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eva
                         end
                     end
                     conflits_par_sommet[sommet_neutre] = count(v -> sol_courante[v] == couleur_neutre, adj[sommet_neutre])
-                    conflits_courant = nb_conflits(sol_courante, adj)
+                    score_courant = sum(conflits_par_sommet[u]^2 for u in 1:n)
                 end
                 push!(sommets_parcourus_plateau, sommet_neutre) # On verrouille ce sommet pour ce plateau
                 plateau_count += 1
@@ -317,11 +317,13 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eva
                 # Amélioration trouvée dans V_2 : on applique les 2 changements
                 sol_courante[u] = cu
                 sol_courante[v] = cv
-                conflits_courant = nb_conflits(sol_courante, adj)
                 if is_pondere
                     for node in 1:n
                         conflits_par_sommet[node] = count(w -> sol_courante[w] == sol_courante[node], adj[node])
                     end
+                    score_courant = sum(conflits_par_sommet[node]^2 for node in 1:n)
+                else
+                    score_courant = nb_conflits(sol_courante, adj)
                 end
                 plateau_count = 0
                 empty!(sommets_parcourus_plateau)
@@ -330,11 +332,13 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eva
                 # Mouvement neutre en 2-color pour naviguer sur le plateau (anti-cycle)
                 sol_courante[u] = cu
                 sol_courante[v] = cv
-                conflits_courant = nb_conflits(sol_courante, adj)
                 if is_pondere
                     for node in 1:n
                         conflits_par_sommet[node] = count(w -> sol_courante[w] == sol_courante[node], adj[node])
                     end
+                    score_courant = sum(conflits_par_sommet[node]^2 for node in 1:n)
+                else
+                    score_courant = nb_conflits(sol_courante, adj)
                 end
                 push!(sommets_parcourus_plateau, u)
                 push!(sommets_parcourus_plateau, v)
@@ -346,7 +350,7 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eva
             end
         end
     end
-    return sol_courante, conflits_courant, a_utilise_v2
+    return sol_courante, score_courant, a_utilise_v2
 end
 
 # Perturbation dans le voisinage k
@@ -412,11 +416,16 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temp
     
     n = size(A, 1)
     couleurs = collect(1:nb_couleurs)
+    is_pondere = (type_obj == "pondere")
     
     # Solution initiale
     solution = dsatur(adj, nb_couleurs)
     meilleure_sol = copy(solution)
-    meilleurs_conflits = nb_conflits(meilleure_sol, adj)
+    if is_pondere
+        meilleurs_conflits = sum(count(v -> meilleure_sol[v] == meilleure_sol[u], adj[u])^2 for u in 1:n)
+    else
+        meilleurs_conflits = nb_conflits(meilleure_sol, adj)
+    end
     conflits_initial = meilleurs_conflits
     conflits_courant = meilleurs_conflits
     
@@ -433,8 +442,12 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temp
     
     if log
         println("Recherche à Voisinage Variable (VNS) : ")
-        println("Sommets : $n | Couleurs cibles : $nb_couleurs | k_max : $k_max | Limite : $(limite_temps)s")
-        println("Conflits initiaux (DSATUR) : $meilleurs_conflits")
+        println("Sommets : $n | Couleurs cibles : $nb_couleurs | k_max : $k_max | Limite : $(limite_temps)s | Objectif : $type_obj")
+        if is_pondere
+            println("Score objectif pondéré initial (DSATUR) : $meilleurs_conflits | Conflits réels : $(nb_conflits(meilleure_sol, adj))")
+        else
+            println("Conflits initiaux (DSATUR) : $meilleurs_conflits")
+        end
     end
     
     if meilleurs_conflits == 0
@@ -547,7 +560,7 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temp
                 if !isempty(historique_solutions)
                     solution = pop!(historique_solutions)
                     solution_base_branche = copy(solution)
-                    conflits_base_branche = nb_conflits(solution, adj)
+                    conflits_base_branche = is_pondere ? sum(count(v -> solution[v] == solution[u], adj[u])^2 for u in 1:n) : nb_conflits(solution, adj)
                     conflits_courant = conflits_base_branche
                     empty!(solutions_visitees_plateau)
                     push!(solutions_visitees_plateau, hash(solution))
@@ -574,7 +587,11 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temp
     vitesse = eval_counter[] / max(duree_resolution, 1e-6)
     if log
         println("Fin VNS")
-        println("Conflits : $meilleurs_conflits (en $iter itérations, $(round(duree_resolution; digits=2)) s)")
+        if is_pondere
+            println("Score objectif pondéré : $meilleurs_conflits | Conflits réels : $(nb_conflits(meilleure_sol, adj)) (en $iter itérations, $(round(duree_resolution; digits=2)) s)")
+        else
+            println("Conflits : $meilleurs_conflits (en $iter itérations, $(round(duree_resolution; digits=2)) s)")
+        end
     end
     if full_output
         return meilleure_sol, conflits_initial, meilleurs_conflits, duree_resolution, temps_meilleur, vitesse
