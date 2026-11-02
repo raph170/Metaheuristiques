@@ -11,7 +11,7 @@ function nb_conflits(solution, adj::Vector{Vector{Int}})
     return conflits
 end
 
-function objectif_pondere(solution, adj)
+function objectif_pondere(solution, adj, k=nothing)
     n = length(solution)
     return sum(count(v -> solution[v] == solution[u], adj[u])^2 for u in 1:n)
 end

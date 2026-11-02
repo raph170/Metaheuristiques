@@ -161,7 +161,7 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eva
     max_c = maximum(couleurs)
     n = length(sol_courante)
     
-    is_pondere = (type_obj == "pondere")
+    is_pondere = (type_obj == "pondéré")
     conflits_par_sommet = is_pondere ? [count(v -> sol_courante[v] == sol_courante[u], adj[u]) for u in 1:n] : Int[]
     somme_voisins_ponderee = is_pondere ? zeros(Int, max_c) : Int[]
     score_courant = is_pondere ? sum(conflits_par_sommet[u]^2 for u in 1:n) : nb_conflits(sol_courante, adj)
@@ -416,7 +416,7 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temp
     
     n = size(A, 1)
     couleurs = collect(1:nb_couleurs)
-    is_pondere = (type_obj == "pondere")
+    is_pondere = (type_obj == "pondéré")
     
     # Solution initiale
     solution = dsatur(adj, nb_couleurs)

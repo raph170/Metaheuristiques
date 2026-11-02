@@ -1,0 +1,6 @@
+Instance,Sommets,Aretes,k,DSATUR_Conflits,Tabou_Conflits,Tabou_Temps,VND_Conflits,VND_Temps
+dsjc125.1,125,736,5,10,0,0.7,0,0.2
+dsjc125.9,125,6961,44,20,0,117.8,0,0.0
+dsjc125.9,125,6961,22,170,110,300.0,107,300.0
+dsjc250.1,250,3218,8,50,0,75.2,0,41.1
+dsjc250.5,250,31336,28,93,3,300.0,4,300.7
