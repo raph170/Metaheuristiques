@@ -128,7 +128,7 @@ end
 ######### VND #########
 #######################
 if meta_heuristique == "VND"
-    sol, conflits = VNS(A, k; adj=adj, max_iter=2000, k_max=50, limite_temps=limite_temps)
+    sol, conflits = VNS(A, k; adj=adj, max_iter=2000, k_max=100, limite_temps=limite_temps)
     println("Conflits finaux VND : ", conflits)
 end
 
