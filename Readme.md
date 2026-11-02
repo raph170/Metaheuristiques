@@ -42,3 +42,12 @@ Pour aller plus loin que le simple tri par degré décroissant :
 - **Population :** un ensemble de colorations dans lequel on essaie de mpinimiser le nombre de conflits
 - **Mutation :**
   - On modifier aléatoirement la couleur de sommets en conflit (voisin *1-color* ou *2-color*).
+
+
+## 5. Pistes :
+
+- Utiliser DSATUR dans la Recherche Tabou :
+  - **Situation actuelle :** Tabou démarre d'une solution aléatoire. C'est un choix qui permet de maximiser la diversité initiale et d'éviter d'enfermer la recherche dans un biais heuristique (une cuvette dans laquelle le minimum total ne se trouve pas forcément).
+  - **Intérêt sur les grands graphes ($n \ge 1000$) :** Sur des instances denses comme `dsjc1000.5` ou `dsjc1000.9`, une initialisation aléatoire commence avec 2000 à 3000 conflits, ce qui oblige l'algorithme à passer plusieurs minutes rien que pour faire le tri initial. DSATUR commence directement autour de 350-450 conflits, ce qui offrirait potentiellement un gain de temps considérable. DSATUR classique est déterministe, Tabou démarrerait toujours de la même solution et explorerait toujours la même vallée lors des redémarrages. Pour l'intégrer efficacement, il faudrait utiliser un **DSATUR randomisé** (ex. tirer au sort parmi les 3 sommets les plus saturés ou parmi les meilleures couleurs disponibles).
+
+- pour un graphe dense (p>=0.6 par exemple), on choisi un échantillnage aléatoire des commets en conflits pour les paires de V_2

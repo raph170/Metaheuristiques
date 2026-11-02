@@ -49,12 +49,12 @@ function voisinage_1_echange(solution, k)
     return voisinage
 end
 
-function _1_echange(solution)
+function _1_echange(solution, k)
     #retourne un seul voisin
     n = length(solution)
     i = rand(1:n)
     c = rand(1:k)
-    while c == solution[i]
+    while c == solution[i] && k > 1
         c = rand(1:k)
     end
     new_sol = copy(solution)

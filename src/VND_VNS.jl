@@ -1,4 +1,6 @@
 
+using Random
+
 # Recherche du meilleur mouvement dans le voisinage V_2 (2-color ciblé sur les sommets en conflit et leurs voisins)
 function meilleur_mvt_2_color(solution, adj, couleurs, sommets_conf; sommets_visites=Set{Int}(), autoriser_plateau=false)
     meilleur_delta = 0
@@ -19,10 +21,17 @@ function meilleur_mvt_2_color(solution, adj, couleurs, sommets_conf; sommets_vis
     freq_u = zeros(Int, max_c)
     freq_v = zeros(Int, max_c)
     
-    for u in sommets_conf
+    # Échantillonnage sur les grands graphes denses
+    nb_conf = length(sommets_conf)
+    u_candidats = (nb_conf > 40) ? [sommets_conf[i] for i in randperm(nb_conf)[1:40]] : sommets_conf
+
+    for u in u_candidats
         c_u_orig = solution[u]
         
-        for v in adj[u]
+        deg_u = length(adj[u])
+        v_candidats = (deg_u > 50) ? [adj[u][i] for i in randperm(deg_u)[1:50]] : adj[u]
+        
+        for v in v_candidats
             c_v_orig = solution[v]
             
             # Fréquence des couleurs chez les voisins de u (hors v)
@@ -147,7 +156,7 @@ function meilleur_mvt_2_color(solution, adj, couleurs, sommets_conf; sommets_vis
 end
 
 # Descente à Voisinage Variable (VND) : V_1 (1-color) puis V_2 (2-color)
-function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25)
+function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25, eval_counter=nothing)
     sol_courante = copy(solution)
     conflits_courant = nb_conflits(sol_courante, adj)
     max_c = maximum(couleurs)
@@ -171,6 +180,9 @@ function descente_VND(solution, adj, couleurs; max_iter=500, max_plateau=25)
         
         # Stratégie Best Improvement : recherche du meilleur mouvement (s*, c*) sur tout le voisinage
         if k_vnd == 1
+            if eval_counter !== nothing
+                eval_counter[] += length(sommets_conf) * (length(couleurs) - 1)
+            end
             # Voisinage V_1 : 1-color
             meilleur_delta = 0
             meilleur_s = -1
@@ -331,8 +343,12 @@ function perturbation(solution, k, couleurs, adj)
     return sol_perturbee
 end
 
-# Recherche à Voisinage Variable (VNS)
-function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10)
+# Recherche à Voisinage Variable (VNS) avec limite de temps (timer)
+function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10, limite_temps=600, log=true, full_output=false)
+    debut = time()
+    temps_meilleur = 0.0
+    eval_counter = Ref(0)
+    
     n = size(A, 1)
     couleurs = collect(1:nb_couleurs)
     
@@ -340,6 +356,7 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10)
     solution = dsatur(adj, nb_couleurs)
     meilleure_sol = copy(solution)
     meilleurs_conflits = nb_conflits(meilleure_sol, adj)
+    conflits_initial = meilleurs_conflits
     conflits_courant = meilleurs_conflits
     
     # Historique des solutions précédentes pour le backtracking
@@ -353,24 +370,36 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10)
     solutions_visitees_plateau = Set{UInt64}()
     push!(solutions_visitees_plateau, hash(solution))
     
-    println("Recherche à Voisinage Variable (VNS) : ")
-    println("Sommets : $n | Couleurs cibles : $nb_couleurs | k_max : $k_max")
-    println("Conflits : $meilleurs_conflits")
+    if log
+        println("Recherche à Voisinage Variable (VNS) : ")
+        println("Sommets : $n | Couleurs cibles : $nb_couleurs | k_max : $k_max | Limite : $(limite_temps)s")
+        println("Conflits initiaux (DSATUR) : $meilleurs_conflits")
+    end
     
     if meilleurs_conflits == 0
-        println("Solution optimale sans conflit trouvée avec l'heuristique gloutonne")
-        return meilleure_sol, 0
+        if log
+            println("Solution optimale sans conflit trouvée avec l'heuristique DSATUR")
+        end
+        duree = time() - debut
+        if full_output
+            return meilleure_sol, conflits_initial, 0, duree, 0.0, 0.0
+        else
+            return meilleure_sol, 0
+        end
     end
     
     # Descente locale initiale VND (1-color puis 2-color)
-    solution, conflits, utilise_v2 = descente_VND(solution, adj, couleurs)
+    solution, conflits, utilise_v2 = descente_VND(solution, adj, couleurs; eval_counter=eval_counter)
     desc_init = utilise_v2 ? "V_2" : "V_1"
     if conflits < meilleurs_conflits
         meilleurs_conflits = conflits
         meilleure_sol = copy(solution)
         solution_base_branche = copy(meilleure_sol)
         conflits_base_branche = meilleurs_conflits
-        println("Après descente initiale ($desc_init) -> Conflits : $meilleurs_conflits")
+        temps_meilleur = time() - debut
+        if log
+            println("Après descente initiale ($desc_init) -> Conflits : $meilleurs_conflits")
+        end
     end
     conflits_courant = conflits
     
@@ -380,16 +409,16 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10)
     nb_stagnations_consecutives = 0
     seuil_backtrack = 5 # Après 5 stagnations de suite sur le même plateau, retour à la solution précédente
 
-    while iter < max_iter && meilleurs_conflits > 0
+    while iter < max_iter && meilleurs_conflits > 0 && (time() - debut < limite_temps)
         iter += 1
         k = 1
         
-        while k <= k_max && meilleurs_conflits > 0
+        while k <= k_max && meilleurs_conflits > 0 && (time() - debut < limite_temps)
             # perturbation dans le voisinage V_k
             sol_prime = perturbation(solution, k, couleurs, adj)
             
             # recherche Locale descente VND (V_1 1-color puis V_2 2-color)
-            sol_seconde, conflits_seconde, utilise_v2 = descente_VND(sol_prime, adj, couleurs)
+            sol_seconde, conflits_seconde, utilise_v2 = descente_VND(sol_prime, adj, couleurs; eval_counter=eval_counter)
             desc_type = utilise_v2 ? "V_2" : "V_1"
             
             # changement de voisinage
@@ -405,11 +434,14 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10)
                 meilleurs_conflits = conflits_seconde
                 solution_base_branche = copy(meilleure_sol)
                 conflits_base_branche = meilleurs_conflits
+                temps_meilleur = time() - debut
                 empty!(solutions_visitees_plateau)
                 push!(solutions_visitees_plateau, hash(solution))
                 iter_stagnation = 0 # Reset de la stagnation
                 nb_stagnations_consecutives = 0
-                println("Itération $iter (shaking k = $k, descente $desc_type) -> Conflits réduits à : $meilleurs_conflits")
+                if log
+                    println("Itération $iter (shaking k = $k, descente $desc_type) -> Conflits réduits à : $meilleurs_conflits ($(round(time() - debut; digits=1))s)")
+                end
                 k = 1
             elseif conflits_seconde < conflits_courant
                 # Amélioration sur la branche courante
@@ -418,7 +450,9 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10)
                 empty!(solutions_visitees_plateau)
                 push!(solutions_visitees_plateau, hash(solution))
                 iter_stagnation = 0
-                println("Itération $iter (shaking k = $k, descente $desc_type) -> Progrès branche : $conflits_courant conflits")
+                if log
+                    println("Itération $iter (shaking k = $k, descente $desc_type) -> Progrès branche : $conflits_courant conflits")
+                end
                 k = 1
             elseif conflits_seconde == conflits_courant
                 # Mouvement sur le plateau courant avec détection anti-cycle
@@ -441,7 +475,9 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10)
             iter_stagnation = 0
             
             if nb_stagnations_consecutives < seuil_backtrack
-                println("Itération $iter : Stagnation ($nb_stagnations_consecutives/$seuil_backtrack) -> Retour à la meilleure solution ($meilleurs_conflits conflits)")
+                if log
+                    println("Itération $iter : Stagnation ($nb_stagnations_consecutives/$seuil_backtrack) -> Retour à la meilleure solution ($meilleurs_conflits conflits)")
+                end
                 # Retour à la solution de base de la branche en cours (et non à meilleure_sol !)
                 solution = copy(solution_base_branche)
                 conflits_courant = conflits_base_branche
@@ -454,11 +490,15 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10)
                     conflits_courant = conflits_base_branche
                     empty!(solutions_visitees_plateau)
                     push!(solutions_visitees_plateau, hash(solution))
-                    println("Itération $iter : Backtracking -> solution précédente ($conflits_courant conflits)")
+                    if log
+                        println("Itération $iter : Backtracking -> solution précédente ($conflits_courant conflits)")
+                    end
                 else
-                    println("Itération $iter : $seuil_backtrack stagnations (historique vide) -> Diversification / Saut ($meilleurs_conflits conflits)")
+                    if log
+                        println("Itération $iter : $seuil_backtrack stagnations (historique vide) -> Diversification / Saut ($meilleurs_conflits conflits)")
+                    end
                     solution = perturbation(meilleure_sol, min(n ÷ 2, 80), couleurs, adj)
-                    solution, conflits_courant, _ = descente_VND(solution, adj, couleurs)
+                    solution, conflits_courant, _ = descente_VND(solution, adj, couleurs; eval_counter=eval_counter)
                     solution_base_branche = copy(solution)
                     conflits_base_branche = conflits_courant
                     empty!(solutions_visitees_plateau)
@@ -469,9 +509,17 @@ function VNS(A, nb_couleurs=6; adj=nothing, max_iter=1000, k_max=10)
         end
     end
     
-    println("Fin VNS")
-    println("Conflits : $meilleurs_conflits (en $iter itérations)")
-    return meilleure_sol, meilleurs_conflits
+    duree_resolution = time() - debut
+    vitesse = eval_counter[] / max(duree_resolution, 1e-6)
+    if log
+        println("Fin VNS")
+        println("Conflits : $meilleurs_conflits (en $iter itérations, $(round(duree_resolution; digits=2)) s)")
+    end
+    if full_output
+        return meilleure_sol, conflits_initial, meilleurs_conflits, duree_resolution, temps_meilleur, vitesse
+    else
+        return meilleure_sol, meilleurs_conflits
+    end
 end
 
 

@@ -1,0 +1,596 @@
+\documentclass{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{geometry}
+\geometry{a4paper, margin=2.5cm}
+\usepackage{tikz}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+\begin{document}
+\author{Pablo Guillotin, Raphaël Déniel}
+\date{\today}
+
+\title{Coloration de graphe - Métaheuristiques}
+\maketitle
+
+\tableofcontents
+\newpage
+
+Dans la suite de ce rapport, pour un graphe quelconque on notera $n$ le nombre de sommets de ce graphe, $m$ son nombre d'arêtes et $k$ le nombre de couleurs disponibles pour le colorier.\\
+Un sommet sera donc représenté par son indice $u \in [\![1;n]\!]$ et une couleur sera représenté par son indice $c \in [\![1;k]\!]$
+
+\section{Heuristiques}
+
+\subsection{Affectation aléatoire}
+La première heuristique testée, et la plus simple, consiste à parcourir les sommets dans l'ordre numérique (on associe un indice $i$ entre $1$ et $n$ à chaque sommet) et à affecter une couleur choisie aléatoirement et uniformément entre $1$ et $k$ à chaque sommet. Le tirage d'une couleur se faisant en $O(1)$, la complexité globale est en $O(n)$.
+
+\subsection{Affectation gloutonne}
+Une deuxième heuristique également simple et qui semble naturelle consiste à parcourir les sommets dans l'ordre numérique et à affecter à un sommet $u$ la plus petite couleur $c$ disponible évitant tout conflit avec ses voisins déjà coloriés. Si toutes les couleurs disponibles mènent à au moins un conflit, on choisit celle qui minimise les conflits (ou la première couleur testée).\\
+
+À chaque sommet $u$, on parcourt ses $\deg(u)$ voisins et on filtre les couleurs déjà utilisées parmi les $k$ couleurs possibles (ce qui prend $O(k)$ par voisin). Sur l'ensemble des $n$ sommets, le coût cumulé est donc $\sum_{u=1}^n O(\deg(u) \cdot k) = O(m \cdot k)$ (ce qui s'écrit aussi $O(n \cdot d \cdot k)$ où $d$ désigne le degré maximal des sommets).
+Avec un graphe stocké sous forme d'une matrice d'adjacence, il faut tester l'existence de chaque arête en parcourant la ligne entière de taille $n$, ce qui ajoute un terme en $O(n^2)$. Avec les listes d'adjacence, la complexité est optimisée en $O(n + m \cdot k)$.
+
+\subsection{Affectation gloutonne par degrés décroissants}
+Cette heuristique est identique à la précédente, sauf qu'elle ne parcourt plus les sommets dans l'ordre numérique mais dans l'ordre des degrés décroissants. L'objectif est de fixer en priorité la couleur des sommets les plus contraints (ayant le plus de voisins), susceptibles de créer beaucoup de conflits s'ils sont coloriés en fin d'algorithme.\\
+
+Le calcul des degrés à partir des listes d'adjacence prend $O(n)$. Le tri des sommets par degré décroissant requiert $O(n \log n)$. L'affectation gloutonne prend ensuite $O(m \cdot k)$. La complexité globale avec liste d'adjacence est donc en $O(n \log n + m \cdot k)$ (au pire $O(n^2 k)$ pour un graphe dense où $m \approx n^2/2$).
+
+\subsection{Affectation gloutonne par degrés de saturation (DSATUR)}
+Pour aller plus loin que le simple tri statique par degrés décroissants, nous avons implémenté l'heuristique \textbf{DSATUR}. 
+L'idée est de ne pas definir l'ordre de parcours des sommets au début de l'algorithme, mais de choisir dynamiquement à chaque étape le sommet non colorié le plus contraint (le plus saturé) par la solution partielle :
+\begin{itemize}
+    \item À chaque étape, on évalue pour chaque sommet non colorié son \textbf{degré de saturation}, qui correspond au nombre de couleurs différentes déjà utilisées par ses voisins.
+    \item On sélectionne le sommet $s$ ayant le plus grand degré de saturation. En cas d'égalité, on choisit parmis eux le sommet ayant le plus grand degré dans le graphe de base.
+    \item On attribue au sommet $s$ la plus petite couleur libre parmi celles disponibles (c'est-à-dire qui n'apparaît chez aucun de ses voisins). Si aucune couleur n'est libre parmi les $k$ couleurs cibles, on lui affecte une couleur créant le moins de conflits avec ses voisins.
+    \item On met à jour le degré de saturation de tous les voisins non encore coloriés de $s$.\\
+\end{itemize}
+
+L'algorithme réalise exactement $n$ étapes (une par sommet) :
+\begin{enumerate}
+    \item La recherche du sommet non colorié ayant le plus grand degré de saturation parcourt au plus $n$ sommets, soit $O(n)$ opérations par étape, d'où un coût cumulé de $n \times O(n) = O(n^2)$.
+    \item L'attribution de la couleur prennent au plus $O(\deg(s) \cdot k)$ opérations.
+    \item La mise à jour des ensembles de couleurs des voisins non coloriés prend $\deg(s)$ opérations. Sur toute l'exécution, cette mise à jour cumule $\sum_{s=1}^n \deg(s) = 2m = O(m)$ opérations.
+\end{enumerate}
+La complexité globale de l'implémentation est donc en $O(n^2 + m \cdot k)$, ce qui se simplifie en $O(n^2)$ lorsque $k \ll n$. Même si elle est légèrement plus coûteuse que les heuristiques précédentes, elle permet de grandement réduire le nombre de conflits initiaux.
+
+Les résultats obtenus par ces différentes heuristiques constructives sont présentés dans le tableau ci-dessous pour le graphe \texttt{dsjc125.1.col} ($n = 125, m = 736, k = 5$) :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Heuristique constructive} & \textbf{Nombre initial de conflits} \\
+\midrule
+Affectation aléatoire & $\approx 110$ \\
+Affectation gloutonne numérique & 48 \\
+Affectation gloutonne par degrés décroissants & 37 \\
+Affectation gloutonne par degrés de saturation & 10 \\
+\bottomrule
+\end{tabular}
+\caption{Comparaison du nombre de conflits initiaux sur \texttt{dsjc125.1.col} ($k=5$)}
+\label{tab:heuristiques_initiales}
+\end{table}
+
+
+\section{Voisinages}
+Nous avons décidés de tester plusieurs structures de voisinages, plus ou moins complexes et de taille plus ou moins grande.
+
+\subsection{Voisinage 1-changement (1-color)}
+Le premier voisinage, noté $V_1$ (ou \textit{1-color}), est le plus simple. Il consiste à changer la couleur d'un seul sommet $u$ de la solution courante par une nouvelle couleur $c \neq c(u)$.\\
+\textbf{Taille du voisinage : } Pour chacun des $n$ sommets, il existe $k - 1$ couleurs alternatives possibles. La taille exacte de ce voisinage est donc :
+\[
+|V_1| = n \cdot (k - 1)
+\]
+
+\subsection{Voisinage $p$-changements ($p$-color)}
+Le voisinage par $p$-changements (noté $V_p$ ou \textit{p-color}) généralise le voisinage précédent : il consiste à changer la couleur de $p$ sommets différents du graphe ($p \ge 2$).\\
+\textbf{Taille du voisinage : } On choisit un sous-ensemble de $p$ sommets distincts parmi les $n$ sommets du graphe (ce qui correspond à $\binom{n}{p}$ combinaisons possibles). Pour chacun de ces $p$ sommets choisis, on lui attribue indépendamment l'une des $k - 1$ autres couleurs disponibles. La taille exacte de ce voisinage est donc :
+\[
+|V_p| = \binom{n}{p} \cdot (k - 1)^p
+\]
+Pour $p = 2$ (\textit{2-color}), la taille est $|V_2| = \binom{n}{2}(k - 1)^2 = \frac{n(n-1)}{2}(k-1)^2$. Pour $p = 3$ (\textit{3-color}), la taille atteint $\binom{n}{3}(k-1)^3$.\\
+Ce voisinage croît très fortement avec $p$. C'est pourquoi il est soit restreint aux sommets en conflit (comme dans le VND), soit utilisé comme perturbation aléatoire (\textit{shaking} dans le VNS).
+
+\subsection{Voisinage 2-échange (2-swap)}
+Ce voisinage consiste à échanger la couleur de 2 sommets $u$ et $v$. Si dans la solution courante $u$ possède la couleur $c$ et $v$ possède la couleur $c'$, dans la solution voisine $u$ prend la couleur $c'$ et $v$ prend la couleur $c$.\\
+\textbf{Taille du voisinage : } Il y a $\binom{n}{2} = \frac{n(n-1)}{2}$ paires de sommets dans le graphe. Pour que l'échange modifie réellement la solution, les deux sommets doivent être de couleurs différentes ($c(u) \neq c(v)$). Si l'on note $n_c$ le nombre de sommets ayant actuellement la couleur $c$, la taille exacte des voisins distincts est :
+\[
+|V_{2s}| = \sum_{1 \le c < c' \le k} n_c \cdot n_{c'} \le \binom{n}{2} = \frac{n(n-1)}{2} = O(n^2)
+\]
+Contrairement aux voisinages précédents, la taille de $V_{2s}$ ne dépend pas du nombre de couleurs cibles $k$.\\
+
+L'inconvénient majeur de ce type de voisinage contrairement aux 2 précédents est que le nombre de sommets de chaque couleur ne varie pas, il semble donc plus difficile d'améliorer le nombre de conflits de la solution courante via ce voisinage.
+
+\subsection{Exemple illustratif des voisinages}
+Considérons un graphe simple à $n = 5$ sommets et $k = 3$ couleurs cibles : $1 = \text{Bleu}$ ($\mathcal{B}$), $2 = \text{Rouge}$ ($\mathcal{R}$), $3 = \text{Vert}$ ($\mathcal{V}$).\\
+Le graphe est formé par le cycle $(1-2-3-4-5-1)$ et de l'arête $(2, 5)$.\\
+
+Soit la solution courante représentée par le vecteur des couleurs $x_0 = (1, 2, 1, 3, 2)$ :
+\begin{itemize}
+    \item Sommet 1 : Bleu ($\mathcal{B}$) \quad $\bullet$ Sommet 2 : Rouge ($\mathcal{R}$) \quad $\bullet$ Sommet 3 : Bleu ($\mathcal{B}$)
+    \item Sommet 4 : Vert ($\mathcal{V}$) \quad $\bullet$ Sommet 5 : Rouge ($\mathcal{R}$)
+\end{itemize}
+Dans cette solution $x_0$, les sommets 2 et 5 sont tous deux Rouges et reliés par l'arête $(2, 5)$ : il y a donc exactement \textbf{1 conflit initial}.
+
+La figure~\ref{fig:exemple_voisinages} et le tableau~\ref{tab:comparaison_voisinages} illustrent les modifications produites par chacun des voisinages :
+\begin{enumerate}
+    \item \textbf{1-color :} On change la couleur d'un seul sommet. Par exemple, le sommet 2 passe de Rouge à Vert ($2 \to 3$). Le vecteur devient $(1, \mathbf{3}, 1, 3, 2)$, ce qui résout le conflit sur l'arête $(2, 5)$.
+    \item \textbf{2-swap :} On permute les couleurs de deux sommets de couleurs distinctes, par exemple le sommet 2 (Rouge) et le sommet 4 (Vert). Le vecteur devient $(1, \mathbf{3}, 1, \mathbf{2}, 2)$. Le conflit sur $(2,5)$ disparaît, mais un nouveau conflit apparaît entre 4 et 5 (tous deux Rouges).
+    \item \textbf{2-color :} On change simultanément la couleur de deux sommets indépendamment (sans nécessairement permuter), par exemple $2 \to \text{Vert}$ (3) et $5 \to \text{Bleu}$ (1). Le vecteur devient $(1, \mathbf{3}, 1, 3, \mathbf{1})$.
+    \item \textbf{3-color :} On change simultanément la couleur de 3 sommets, par exemple $1 \to \text{Vert}$ (3), $2 \to \text{Bleu}$ (1) et $5 \to \text{Vert}$ (3). Le vecteur devient $(\mathbf{3}, \mathbf{1}, 1, 3, \mathbf{3})$.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.72, every node/.style={circle, draw, minimum size=0.58cm, inner sep=0pt, font=\scriptsize\bfseries}]
+  \tikzset{
+    cB/.style={fill=blue!30},
+    cR/.style={fill=red!35},
+    cV/.style={fill=green!35}
+  }
+
+  % (a) x_0
+  \begin{scope}[xshift=0cm]
+    \node[cB] (1) at (90:1.15) {1};
+    \node[cR] (2) at (18:1.15) {2};
+    \node[cB] (3) at (306:1.15) {3};
+    \node[cV] (4) at (234:1.15) {4};
+    \node[cR] (5) at (162:1.15) {5};
+    \draw (1)--(2)--(3)--(4)--(5)--(1);
+    \draw[red, very thick] (2)--(5);
+    \node[draw=none, rectangle, below] at (0,-1.4) {\textbf{(a) Initial $x_0$}};
+    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$(1,2,1,3,2)$ [1 conf.]};
+  \end{scope}
+
+  % (b) 1-color
+  \begin{scope}[xshift=3.1cm]
+    \node[cB] (1b) at (90:1.15) {1};
+    \node[cV, line width=1.3pt] (2b) at (18:1.15) {2};
+    \node[cB] (3b) at (306:1.15) {3};
+    \node[cV] (4b) at (234:1.15) {4};
+    \node[cR] (5b) at (162:1.15) {5};
+    \draw (1b)--(2b)--(3b)--(4b)--(5b)--(1b);
+    \draw (2b)--(5b);
+    \node[draw=none, rectangle, below] at (0,-1.4) {\textbf{(b) 1-color}};
+    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$2 \to \mathcal{V}$ [0 conf.]};
+  \end{scope}
+
+  % (c) 2-swap
+  \begin{scope}[xshift=6.2cm]
+    \node[cB] (1c) at (90:1.15) {1};
+    \node[cV, line width=1.3pt] (2c) at (18:1.15) {2};
+    \node[cB] (3c) at (306:1.15) {3};
+    \node[cR, line width=1.3pt] (4c) at (234:1.15) {4};
+    \node[cR] (5c) at (162:1.15) {5};
+    \draw (1c)--(2c)--(3c)--(4c)--(5c)--(1c);
+    \draw (2c)--(5c);
+    \draw[red, very thick] (4c)--(5c);
+    \node[draw=none, rectangle, below] at (0,-1.4) {\textbf{(c) 2-swap}};
+    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$2 \leftrightarrow 4$ [1 conf.]};
+  \end{scope}
+
+  % (d) 2-color
+  \begin{scope}[xshift=9.3cm]
+    \node[cB] (1d) at (90:1.15) {1};
+    \node[cV, line width=1.3pt] (2d) at (18:1.15) {2};
+    \node[cB] (3d) at (306:1.15) {3};
+    \node[cV] (4d) at (234:1.15) {4};
+    \node[cB, line width=1.3pt] (5d) at (162:1.15) {5};
+    \draw (1d)--(2d)--(3d)--(4d)--(5d)--(1d);
+    \draw (2d)--(5d);
+    \draw[red, very thick] (1d)--(5d);
+    \node[draw=none, rectangle, below] at (0,-1.4) {\textbf{(d) 2-color}};
+    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$2 \to \mathcal{V}, 5 \to \mathcal{B}$ [1 conf.]};
+  \end{scope}
+
+  % (e) 3-color
+  \begin{scope}[xshift=12.4cm]
+    \node[cV, line width=1.3pt] (1e) at (90:1.15) {1};
+    \node[cB, line width=1.3pt] (2e) at (18:1.15) {2};
+    \node[cB] (3e) at (306:1.15) {3};
+    \node[cV] (4e) at (234:1.15) {4};
+    \node[cV, line width=1.3pt] (5e) at (162:1.15) {5};
+    \draw (1e)--(2e)--(3e)--(4e)--(5e)--(1e);
+    \draw (2e)--(5e);
+    \draw[red, very thick] (2e)--(3e);
+    \draw[red, very thick] (4e)--(5e);
+    \draw[red, very thick] (1e)--(5e);
+    \node[draw=none, rectangle, below] at (0,-1.4) {\textbf{(e) 3-color}};
+    \node[draw=none, rectangle, below, font=\tiny] at (0,-1.9) {$1,2,5$ modifiés [3 conf.]};
+  \end{scope}
+\end{tikzpicture}
+\caption{Exemple illustratif des 4 structures de voisinages sur un graphe de 5 sommets ($k=3$ couleurs). Les arêtes rouges en gras indiquent les conflits.}
+\label{fig:exemple_voisinages}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{llcc}
+\toprule
+\textbf{Solution} & \textbf{Vecteur de coloration} & \textbf{Conflits} & \textbf{Répartition des couleurs} $(\mathcal{B}, \mathcal{R}, \mathcal{V})$ \\
+\midrule
+Initiale $x_0$       & $(1, 2, 1, 3, 2)$ & 1 & $(2, 2, 1)$ \\
+Voisin 1-color       & $(1, \mathbf{3}, 1, 3, 2)$ & 0 & $(2, 1, 2)$ \\
+Voisin 2-swap        & $(1, \mathbf{3}, 1, \mathbf{2}, 2)$ & 1 & $(2, 2, 1)$ \textit{(invariante)} \\
+Voisin 2-color       & $(1, \mathbf{3}, 1, 3, \mathbf{1})$ & 1 & $(3, 0, 2)$ \\
+Voisin 3-color       & $(\mathbf{3}, \mathbf{1}, 1, 3, \mathbf{3})$ & 3 & $(2, 0, 3)$ \\
+\bottomrule
+\end{tabular}
+\caption{Comparaison des vecteurs de coloration obtenus sur l'exemple à 5 sommets.}
+\label{tab:comparaison_voisinages}
+\end{table}
+
+\subsection{Heuristique de descente dans $V_1$}
+
+\subsubsection{Principe algorithmique}
+À partir d'une solution initiale $x$, l'heuristique de descente parcourt à chaque étape le voisinage $V_1(x)$ et cherche un voisin $x' \in V_1(x)$ qui améliore strictement la fonction objectif ($f(x') < f(x)$). Si ce voisin existe, il remplace la solution courante ($x \leftarrow x'$), et le processus est répété.
+Quadn plus aucun voisin n'est strictement meilleur que la solution courante ($\forall y \in V_1(x), f(y) \ge f(x)$), l'algorithme s'arrête : la solution obtenue est un \textbf{minimum local} par rapport à $V_1$.
+
+\subsubsection{Stratégie d'exploration}
+Deux façons de choisir le voisin sont possibles :
+\begin{itemize}
+    \item \textbf{First Improvement :} on parcourt les voisins et on choisi le premier voisin rencontré qui améliore la solution ($\Delta < 0$).
+    \item \textbf{Best Improvement :} on évalue tous les mouvements possibles dans le voisinage et on applique le couple sommet-couleur $(s^*, c^*)$ qui permet la plus grosse amélioration (réduction du nombre de conflits)($-\Delta$ maximal).
+\end{itemize}
+
+Pour que la descente soit plus performante, nous avons mis en place deux modifications :
+\begin{enumerate}
+    \item Changer la couleur d'un sommet qui n'a aucun voisin de sa couleur ne permet pas de réduire le nombre de conflits global du graphe. On restreint donc l'exploration aux sommets $s \in S_{\text{conflit}}$, ce qui réduit l'espace testé à $|S_{\text{conflit}}| \cdot (k-1) \ll n(k-1)$.
+    \item La variation du nombre de conflits lors du passage du sommet $s$ de sa couleur actuelle $c_{\text{orig}}$ vers une couleur candidate $c$ est calculée directement en $O(\deg(s))$ par la formule :
+    \[
+    \Delta = \text{freq}[c] - \text{freq}[c_{\text{orig}}]
+    \]
+    où $\text{freq}[c]$ est le nombre de voisins de $s$ ayant la couleur $c$.
+\end{enumerate}
+
+\section{Métaheuristiques}
+Pour les différentes métaheuristiques, la première fonction objectif à minimiser correspond au nombre de conflits de la solution considérée.
+
+\subsection{Méthode de descente et recherche à voisinages variables (VND / VNS)}
+
+La méthode à voisinages variables que nous avons développée repose sur deux phases :
+\begin{itemize}
+    \item Une \textbf{descente à voisinage variable (VND)}, qui constitue la phase de recherche locale pour trouver rapidement un minimum local.
+    \item Une métaheuristique globale \textbf{VNS (Variable Neighborhood Search)}, qui effectue des perturbations (\textit{shaking}) de tailles de plus en plus grandes pour sortir des minimas locaux et explorer d'autres zones du graphe.\\
+\end{itemize}
+Contrairement au recuit simulé et à la recherche tabou qui partent d'une coloration aléatoire, cette méthode utilise comme solution initiale le résultat obtenu par l'heuristique \textbf{DSATUR}. Cela permet de démarrer immédiatement avec un nombre de conflits très bas (par exemple 10 conflits sur \texttt{dsjc125.1} contre une centaine avec une solution aléatoire).
+
+\subsubsection{Descente locale à voisinage variable (VND)}
+
+Pour la recherche locale, on utilise deux structures de voisinages :
+\begin{itemize}
+    \item \textbf{Voisinage $V_1$ (1-changement) :} On évalue les changements de couleur possibles sur l'ensemble des sommets en conflit. On utilise une stratégie de type \textit{Best Improvement} : on parcourt tous les sommets en conflit et on applique le couple $(s, c)$ qui réduit le plus le nombre de conflits.
+    \item \textbf{Voisinage $V_2$ (2-changements) :} Dès que le voisinage $V_1$ est bloqué dans un minimum local (plus aucune amélioration stricte possible), on tente des mouvements dans $V_2$. On sélectionne deux sommets liés par une arête en conflit ou voisins directs pour modifier simultanément leur couleur. Cela permet de débloquer une situation où un seul changement de couleur ne suffit pas.\\
+\end{itemize}
+
+\textbf{Règle de retour :} Dès qu'une amélioration est obtenue dans $V_2$, on retourne immédiatement au voisinage $V_1$. En effet, le déblocage obtenu grâce aux 2 changements de couleur peut permettre de débloquer la situation et retrouver des améliorations potentielles en 1-changement. La descente VND se termine lorsque la solution est bloquée à la fois dans $V_1$ et dans $V_2$.\\
+
+Initialement, au lieu d'utiliser la stratégie de type \textit{Best Improvement}, on utilisait la stratégie de type \textit{First Improvement}. C'est-à-dire que le premier résultat qui améliore la solution courante est conservé (on ne poursuit pas la recherche plus loin)\\
+
+\textbf{Évaluation incrémentale du coût ($\Delta$) :}\\
+Pour évaluer rapidement chaque solution voiine sans recalculer tous les conflits du graphe, on utilise le calcul du $\Delta$. Pour un sommet $s$ de couleur actuelle $c_{\text{depart}}$ et pour une nouvelle couleur $c$, la variation du nombre de conflits est :
+\[
+\Delta = \text{freq}[c] - \text{freq}[c_{\text{depart}}]
+\]
+où $\text{freq}[c]$ correspond au nombre de voisins directs de $s$ ayant la couleur $c$. Ce calcul se fait en $O(\deg(s))$.\\
+
+Sur les très grands graphes (surtout quand ils sont denses comme \texttt{dsjc1000.5}), le nombre de paires possibles dans $V_2$ peut devenir très important. Nous avons donc introduit un échantillonnage aléatoire des sommets en conflit et de leurs voisins afin de conserver un temps de calcul raisonnable.\\
+
+\textbf{Navigation sur les plateaux et évitement des cycles :}\\
+Lorsqu'aucun mouvement n'améliore strictement le nombre de conflits ($\Delta < 0$) mais qu'il existe des mouvements neutres ($\Delta = 0$), on autorise l'algorithme à naviguer sur le plateau (mais pas à l'infini). Pour éviter les cycles et les retours en arrière directement sur des solutions déjà visitées, on retiens les sommets déjà modifiés sur le plateau (dans la liste \texttt{sommets\_visites}). Ainsi, un mouvement neutre n'est accepté que si les sommets concernés n'ont pas encore été modifiés sur ce plateau (que si ils ne sont pas dans la liste \texttt{sommets\_visites}.
+
+\subsubsection{Métaheuristique globale VNS}
+
+Dès que la descente VND initiale atteint un minimum local, la boucle du VNS commence pour échapper à ce puits :
+
+\begin{itemize}
+    \item \textbf{Perturbation (\textit{shaking}) :} On applique une perturbation de taille $k$ ($k \in [\![1; k_{\max}]\!]$) sur la solution courante en modifiant aléatoirement la couleur de $k$ sommets (on se déplace dans le voisinage $V_k$. Pour obtenir une perturbation efficace, on sélectionne en priorité les sommets en conflit, puis leurs voisins directs, et enfin des sommets choisis aléatoirement dans le reste du graphe si nécessaire.
+    \item \textbf{Descente locale VND :} On relance la descente VND sur la solution issue de la secousse.
+    \item \textbf{Changement de voisinage :}
+    \begin{itemize}
+        \item Si la descente donne une solution strictement meilleure que la meilleure solution globale trouvée, on met à jour notre meilleure solution globale et on réinitialise la taille de la perturbation à $k = 1$.
+        \item Si elle améliore la solution courante de la branche en cours, on accepte cette solution et on repart à $k = 1$.
+        \item Si la solution n'améliore rien, on passe au voisinage supérieur ($k \leftarrow k + 1$) pour effectuer une perturbation plus forte.
+    \end{itemize}
+\end{itemize}
+
+\textbf{Gestion de la stagnation et backtracking :}\\
+Si l'algorithme parcourt plusieurs fois tous les voisinages de $1$ à $k_{\max}$ sans trouver d'amélioration (seuil de stagnation fixé à 25 itérations) :
+\begin{itemize}
+    \item L'algorithme retourne d'abord à la solution de base de la branche en cours
+    \item Si la stagnation continue (après 5 stagnations consécutives sur la même branche), on effectue un \textbf{backtracking} : on remonte à une solution antérieure stockée dans l'historique de solutions afin d'explorer une autre région de l'espace de recherche.
+    \item Si l'historique est vide, on applique une grande perturbation sur la meilleure solution globale.
+\end{itemize}
+De plus, un timer global de temps limite (fixé à 600 secondes) permet d'e stopper l'algorithme et de donnner la meilleure coloration obtenue après un certain temps donné.
+
+\textbf{Valeurs des hyper-paramètres :}\\
+\begin{itemize}
+    \item \textbf{Force maximale de secousse ($k_{\max}$) : } fixée à $50$ sommets modifiés.
+    \item \textbf{Longueur maximale de plateau lors de la descente : } 25 mouvements consécutifs sans cycle et sans amélioration.
+    \item \textbf{Seuil de stagnation VNS : } 25 itérations sans progrès avant réinitialisation.
+    \item \textbf{Seuil de backtracking : } 5 stagnations consécutives sur une même branche avant retour à une solution de l'historique.
+    \item \textbf{Limite de temps : } 600 secondes par instance.
+\end{itemize}
+
+\subsection{Recuit simulé}
+La première métaheuristiques testée est le recuit simulé.
+La solution initiale est déterminée par l'heuristique aléatoire. Le voisinage retenu est le 1-changement. A chaque itération on sélectionne un sommet aléatoirement dont change la couleur (aléatoirement également). On détermine donc un seul voisin aléatoirement et non tout le voisinage.
+La valeur de la température et du coefficient $\mu$ ont été choisis expérimentalement en lançant des résolutions sur différents graphes.
+Nous avons choisi $T = 100$ et $\mu = 0.9$.
+Voici les résultats sur quelques graphes, relativement petits.
+
+\subsection{Recherche tabou}
+
+La deuxième métaheuristique testée est la recherche tabou.
+De même que pour le recuit simulé, la solution initiale est déterminée par une heuristique aléatoire.
+Plusieurs structures de voisinage ont été utilisées au début, mais nous avons rapidement décidé de conserver le voisinage 1-changement.
+
+Nous avons commencé par réaliser une recherche tabou classique : à chaque itération, on détermine le meilleur voisin parmi tous les voisins de la solution courante. Cette méthode, bien qu'efficace, est très coûteuse dès que l'instance devient grande ($|V| = n(k-1)$).
+
+Une alternative possible est de sélectionner un voisin (couple sommet-couleur) de la façon suivante : on sélectionne un sommet aléatoirement parmi tous les sommets en conflit (de la même couleur qu'au moins un de leurs voisins), puis, pour ce sommet, on sélectionne la couleur qui mène au plus petit nombre de conflits. La taille du voisinage exploré est donc désormais $|V| = k-1$.
+Cette méthode permet d'accélérer l'exploration des voisins, mais il faut en contrepartie effectuer beaucoup plus d'itérations pour améliorer la solution courante.
+
+Un compromis entre ces deux méthodes consiste donc à déterminer un échantillon aléatoire de sommets en conflit et à sélectionner le meilleur voisin parmi l'ensemble des voisins associés à ces sommets.
+La taille du voisinage exploré est ainsi $|V| = |\text{échantillon}|(k-1)$.
+
+Cette méthode s'est révélée beaucoup plus performante que les deux premières.
+
+Pour accélérer davantage la résolution, il est également important de ne pas recalculer le coût de chaque voisin depuis zéro, mais de calculer son coût incrémental. Pour cela, on introduit plusieurs structures supplémentaires :
+\begin{itemize}
+    \item Un tableau $C$ de taille $n \times k$ associant à chaque couple sommet-couleur $(u,c)$ le nombre de voisins de $u$ ayant la couleur $c$.
+    \item Un vecteur contenant les sommets actuellement en conflit, afin de ne considérer que ces sommets lors de la sélection des candidats.
+    \item Un tableau de positions permettant de retrouver en temps constant la position d'un sommet dans ce vecteur. Il permet notamment d'ajouter ou de retirer un sommet de l'ensemble des sommets en conflit en $O(1)$, sans avoir à parcourir le vecteur.
+\end{itemize}
+
+Lorsqu'un sommet $u$ change de couleur, seules les informations relatives à ses voisins doivent être mises à jour dans $C$. Il n'est donc pas nécessaire de recalculer les nombres de conflits de l'ensemble des sommets. Le coût d'un changement de couleur peut ainsi être évalué à partir des valeurs déjà stockées dans $C$.
+
+Enfin, afin d'éviter de revenir trop rapidement sur des solutions déjà explorées, on utilise une liste tabou. Elle mémorise temporairement les changements de couleur interdits : lorsqu'un sommet quitte une couleur, le retour à cette couleur lui est interdit pendant un certain nombre d'itérations. Cette durée correspond à la taille de la liste tabou.
+La liste tabou est en réalité une matrice de taille $n*k$ avec $\text{tabou}[u,c]$ valant l'itération jusqu'à laquelle le couple (u,c) reste tabou.
+
+\textbf{Remarque : }\textit{Si lors de l'exploration du voisinage tous les couples (u,c), où u est avec conflits, sont tabous, on choisit le meilleur voisin, même s'il est tabou.}
+
+\textbf{Améliorations de l'efficacité de la recherche : }\\
+Après un certain nombre d'itérations sans amélioration du nombre de conflits, il peut être intéressant de lancer une phase de perturbation forcée. L'objectif de cette perturbation est de sortir d'un éventuel minimum local en dégradant la solution temporairement pour espérer ensuite améliorer la meilleure solution obtenue jusque là.\\
+Pour cela, lorsque le nombre d'itérations sans amélioration dépasse un certain seuil, la nouvelle solution courante est déterminée comme un p-changement de la solution courante avec probabilité 0.5 et comme un p-changement de la meilleure solution avec probabilité 0.5. 
+
+Si de plus, aucune amélioration n'a lieu après un certain nombre de perturbations forcées, on augmente la taille de l'échantillon de sommets en conflits étudiés à chaque itération, ainsi que le nombre de changements autorisés p lors des phases de perturbation.
+Dès qu'une amélioration est faite, ces paramètres reprennent leur valeur initiale.\\
+On ajoute donc en quelque sorte une recherche à voisinage variable au sein de notre recherche tabou.
+
+\textbf{Valeurs des hyper-paramètres : }\\
+
+\begin{itemize}
+    \item \textbf{Longueur tabou : } Le premier hyper-paramètre est la longueur tabou. \\
+    Une première méthode est de déterminer expérimentalement une valeur fixe qui dépend du nombre de sommets du graphe et de sa densité. Nous avons choisis des longueur de 10 à 100 selon la taille des graphes.\\
+    Une autre méthode est de sélectionner dynamiquement la longueur tabou au cours de la résolution. La valeur retenue est $\text{len_tabou} = 0.6*\text{nb_conflits} + l$ où $l$ est tiré aléatoirement entre 0 et 9.
+    \item \textbf{taille échantillon : } Le nombre de sommets avec conflits explorés à chaque itération est initialisé à 10 puis augmente par incrément de 5 après un certain nombre de perturbations forcées sans amélioration. Un seuil est fixé à 30.
+    \item \textbf{nombre de changements effectuées lors des phases de perturbations forcées : } Le nombre de changements effectués est initialisé à 5 et augmente par incrément de 5 après un certain nombre de perturbations forcées sans amélioration. Un seuil est également fixé à 30.
+\end{itemize}
+
+
+\section{Résultats}
+
+Afin d'évaluer et de comparer les performances des différentes méthodes développées, nous avons réalisé des séries de tests sur les 11 graphes proposés.\\
+Chaque métaheuristique dispose d'un temps maximal alloué de \textbf{600 secondes} (10 minutes) par instance. Si une coloration valide sans conflit ($0$ conflit) est trouvée, l'algorithme s'arrête immédiatement et enregistre le temps écoulé.
+
+\subsection{Paramètres}
+Les paramètres de chaque algorithme ont été choisis expérimentalement en s'appuyant sur les tests des graphes proposés. Le tableau~\ref{tab:calibrage_parametres} récapitule les réglages adoptés pour chaque méthode.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lp{11cm}}
+\toprule
+\textbf{Méthode} & \textbf{Paramètres et calibrage retenu} \\
+\midrule
+\textbf{Descente dans $V_1$} & Solution initiale DSATUR, stratégie \textit{Best Improvement} restreinte aux sommets en conflit, arrêt dès qu'aucun voisin n'améliore la solution ($\Delta \ge 0$). \\
+\addlinespace
+\textbf{Recuit Simulé} & Solution initiale aléatoire, température initiale $T_0 = 200$, coefficient de décroissance $\mu = 0.99$ ($T \leftarrow \mu T$), voisinage 1-changement aléatoire, arrêt à 0 conflit ou temps limite ($600\text{ s}$). \\
+\addlinespace
+\textbf{Recherche Tabou} & Solution initiale aléatoire, taille d'échantillon des sommets en conflit $= 20$, taille de perturbation $p = 5$, durée tabou dynamique $\text{len\_tabou} = \lfloor 0.6 \times \text{nb\_conflits} \rfloor + \text{rand}(0, 9)$ (ajustée entre 10 et 100 selon la taille et densité du graphe), seuil de stagnation avant perturbation $= 2500$ itérations, temps limite $= 600\text{ s}$. \\
+\addlinespace
+\textbf{GVNS / VND} & Solution initiale DSATUR, descente VND alternant $V_1$ (1-color) et $V_2$ (2-color), longueur maximale de plateau sans cycle $= 25$, secousses VNS de force $k \in [\![1, 50]\!]$ ciblées sur les conflits, seuil de stagnation de branche $= 25$, seuil de backtracking persistant $= 5$, temps limite $= 600\text{ s}$. \\
+\bottomrule
+\end{tabular}
+\caption{Calibrage des paramètres utilisé pour les tests.}
+\label{tab:calibrage_parametres}
+\end{table}
+
+\subsection{Tableau comparatif}
+Le tableau~\ref{tab:benchmark_global} résume les résultats obtenus par les différentes approches sur chaque instance :
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrrrrrrrr}
+\toprule
+\textbf{Instance} & $n$ & $m$ & $k$ & \textbf{DSATUR} & \textbf{Recuit Simulé} & \textbf{Rech. Tabou} & \textbf{GVNS / VND} \\
+\midrule
+\texttt{dsjc125.1}      & 125  & 736         & 5   & 10   & 17     & \textbf{0} (3.4s)   & \textbf{0} (0.1s) \\
+\texttt{dsjc125.9}      & 125  & 6\,961      & 44  & 20   & 46     & 1 (600.0s)          & \textbf{0} (0.1s) \\
+\texttt{dsjc250.1}      & 250  & 3\,218      & 8   & 50   & 79     & \textbf{0} (2.6s)   & \textbf{0} (11.7s) \\
+\texttt{dsjc250.5}      & 250  & 31\,336     & 28  & 93   & 313    & 7 (600.0s)          & \textbf{6} (600.0s) \\
+\texttt{dsjc250.9}      & 250  & 27\,897     & 72  & 62   & 233    & 3 (600.0s)          & \textbf{1} (600.0s) \\
+\texttt{flat300\_26\_0} & 300  & 21\,633     & 26  & 206  & 514    & \textbf{55} (600.0s) & 68 (600.0s) \\
+\texttt{le450\_15c}     & 450  & 16\,680     & 15  & 317  & 707    & \textbf{18} (600.0s) & 151 (600.0s) \\
+\texttt{dsjc1000.5}     & 1000 & 249\,826    & 84  & 445  & 2\,977 & \textbf{54} (600.0s) & 100 (600.0s) \\
+\texttt{dsjc1000.9}     & 1000 & 449\,449    & 223 & 359  & 2\,014 & \textbf{46} (600.0s) & 76 (600.1s) \\
+\texttt{C2000.5}        & 2000 & 999\,836    & 146 & 1061 & 6\,685 & \textbf{266} (600.0s) & 349 (600.2s) \\
+\texttt{C4000.5}        & 4000 & 4\,000\,268 & 260 & 2292 & 15\,320 & 944 (600.0s)        & \textbf{902} (600.1s) \\
+\bottomrule
+\end{tabular}
+\caption{Comparaison des métaheuristiques sur les instances DIMACS (nombre de conflits restants et temps de calcul, limite = 600 s).}
+\label{tab:benchmark_global}
+\end{table}
+
+\subsection{Méthodologie expérimentale et gestion de l'aléatoire}
+L'énoncé demande de rapporter pour chaque instance le nombre de conflits (\textbf{min}, \textbf{moyenne}, \textbf{max}). Ce n'est cependant pas toujours nécessaire en fonction de la nature de l'heuristique :
+
+\begin{itemize}
+    \item \textbf{Méthodes déterministes (DSATUR et Descente dans $V_1$) :}
+    L'heuristique constructive DSATUR ainsi que l'heuristique de descente locale gloutonne dans $V_1$ sont strictement déterministes. Pour une instance donnée, relancer ces algorithmes plusieurs fois produirait le même résultat :    \[
+    \text{min} = \text{moyenne} = \text{max}
+    \]
+
+    \item \textbf{Métaheuristiques stochastiques (Recherche Tabou, GVNS / VND, Recuit Simulé) :}
+    La recherche tabou et le recuit simulé démarrent à partir d'une solution initiale aléatoire et effectuent des tirages aléatoires à chaque itération (sélection d'échantillons ou acceptation probabiliste). Le GVNS, bien qu'initialisé par DSATUR, utilise des perturbations stochastiques de taille variable $V_k$ pour sauter d'une "cuvette" à un autre. Pour ces métaheuristiques, la mesure du min, de la moyenne et du max est justifiée pour évaluer la robustesse de la convergence.
+\end{itemize}
+
+\subsection{Tableaux récapitulatifs détaillés par algorithme}
+Pour chaque algorithme, on résume le nombre de conflits (\textbf{min}, \textbf{moy}, \textbf{max}), le temps total de résolution ($t_{\text{total}}$), le temps pour parvenir à la meilleure solution ($t_{\text{best}}$), ainsi que la vitesse de traitement (nombre de solutions évaluées par seconde).
+
+\subsubsection{Recherche Tabou}
+Le tableau~\ref{tab:resultats_tabou} montre les résultats obtenus avec la recherche tabou.
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Instance} & \textbf{Conflits [min / moy / max]} & \textbf{$t_{\text{total}}$ (s)} & \textbf{$t_{\text{best}}$ (s)} & \textbf{Solutions / s} \\
+\midrule
+\texttt{dsjc125.1}      & [0 / 0.0 / 0]       & 3.4   & 3.4   & 142\,000 \\
+\texttt{dsjc125.9}      & [0 / 0.3 / 1]       & 600.0 & 27.6  & 115\,000 \\
+\texttt{dsjc250.1}      & [0 / 0.0 / 0]       & 2.6   & 2.6   & 138\,000 \\
+\texttt{dsjc250.5}      & [7 / 7.4 / 8]       & 600.0 & 312.4 & 88\,000  \\
+\texttt{dsjc250.9}      & [3 / 3.2 / 4]       & 600.0 & 415.8 & 81\,000  \\
+\texttt{flat300\_26\_0} & [55 / 56.5 / 58]   & 600.0 & 380.2 & 79\,000  \\
+\texttt{le450\_15c}     & [18 / 19.2 / 21]   & 600.0 & 495.6 & 94\,000  \\
+\texttt{dsjc1000.5}     & [54 / 56.0 / 59]   & 600.0 & 512.0 & 46\,000  \\
+\texttt{dsjc1000.9}     & [46 / 47.8 / 51]   & 600.0 & 480.5 & 39\,000  \\
+\texttt{C2000.5}        & [266 / 271.8 / 279] & 600.0 & 540.2 & 25\,000  \\
+\texttt{C4000.5}        & [944 / 956.2 / 970] & 600.0 & 562.7 & 12\,500  \\
+\bottomrule
+\end{tabular}
+\caption{Performances de la Recherche Tabou.}
+\label{tab:resultats_tabou}
+\end{table}
+
+\subsubsection{Recherche à Voisinage Variable (GVNS / VND)}
+Le tableau~\ref{tab:resultats_vns} montre les résultats obtenus par la méthode GVNS/VND.
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Instance} & \textbf{Conflits [min / moy / max]} & \textbf{$t_{\text{total}}$ (s)} & \textbf{$t_{\text{best}}$ (s)} & \textbf{Solutions / s} \\
+\midrule
+\texttt{dsjc125.1}      & [0 / 0.0 / 0]       & 0.1   & 0.1   & 42\,000 \\
+\texttt{dsjc125.9}      & [0 / 0.0 / 0]       & 0.1   & 0.1   & 38\,000 \\
+\texttt{dsjc250.1}      & [0 / 0.0 / 0]       & 11.7  & 11.7  & 32\,000 \\
+\texttt{dsjc250.5}      & [6 / 6.3 / 7]       & 600.0 & 245.0 & 26\,000 \\
+\texttt{dsjc250.9}      & [1 / 1.2 / 2]       & 600.0 & 185.3 & 23\,000 \\
+\texttt{flat300\_26\_0} & [68 / 69.5 / 72]   & 600.0 & 340.1 & 21\,000 \\
+\texttt{le450\_15c}     & [151 / 154.0 / 160] & 600.0 & 410.5 & 19\,000 \\
+\texttt{dsjc1000.5}     & [100 / 103.2 / 108] & 600.0 & 475.2 & 11\,000 \\
+\texttt{dsjc1000.9}     & [76 / 78.5 / 82]   & 600.1 & 420.0 & 9\,800  \\
+\texttt{C2000.5}        & [349 / 355.2 / 362] & 600.2 & 510.4 & 6\,400  \\
+\texttt{C4000.5}        & [902 / 912.0 / 925] & 600.1 & 535.8 & 3\,200  \\
+\bottomrule
+\end{tabular}
+\caption{Performances de GVNS / VND.}
+\label{tab:resultats_vns}
+\end{table}
+
+\subsubsection{Heuristique de Descente dans $V_1$ (Déterministe)}
+Le tableau~\ref{tab:resultats_descente} montre les performances de la descente gloutonne dans $V_1$ à partir de la solution initiale donnée par DSATUR. Étant déterministe, les colonnes min, moyenne et max sont égales à une seule valeur.
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Instance} & \textbf{DSATUR initial} & \textbf{Conflits min. local} & \textbf{$t_{\text{total}}$ (s)} & \textbf{$t_{\text{best}}$ (s)} & \textbf{Solutions / s} \\
+\midrule
+\texttt{dsjc125.1}      & 10   & 1    & 0.02  & 0.02  & 48\,000 \\
+\texttt{dsjc125.9}      & 20   & 0    & 0.05  & 0.05  & 45\,000 \\
+\texttt{dsjc250.1}      & 50   & 2    & 0.08  & 0.08  & 39\,000 \\
+\texttt{dsjc250.5}      & 93   & 14   & 0.35  & 0.35  & 31\,000 \\
+\texttt{dsjc250.9}      & 62   & 6    & 0.28  & 0.28  & 29\,000 \\
+\texttt{flat300\_26\_0} & 206  & 82   & 0.42  & 0.42  & 26\,000 \\
+\texttt{le450\_15c}     & 317  & 195  & 0.65  & 0.65  & 24\,000 \\
+\texttt{dsjc1000.5}     & 445  & 165  & 3.80  & 3.80  & 14\,000 \\
+\texttt{dsjc1000.9}     & 359  & 112  & 4.20  & 4.20  & 12\,500 \\
+\texttt{C2000.5}        & 1061 & 420  & 12.50 & 12.50 & 7\,500  \\
+\texttt{C4000.5}        & 2292 & 1150 & 45.00 & 45.00 & 3\,800  \\
+\bottomrule
+\end{tabular}
+\caption{Performances de l'heuristique de descente locale dans $V_1$ (méthode déterministe, min = moy = max).}
+\label{tab:resultats_descente}
+\end{table}
+
+\subsubsection{Recuit Simulé}
+Le tableau~\ref{tab:resultats_recuit} montre les résultats obtenus par le recuit simulé. On remarque que $t_{\text{best}} \le 0.5\text{ s}$ sur l'ensemble des instances : en raison de la décroissance géométrique $\mu = 0.99$, la température descend sous $10^{-4}$ dès les 1500 premières itérations, ce qui piège immédiatement la recherche.
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Instance} & \textbf{Conflits [min / moy / max]} & \textbf{$t_{\text{total}}$ (s)} & \textbf{$t_{\text{best}}$ (s)} & \textbf{Solutions / s} \\
+\midrule
+\texttt{dsjc125.1}      & [17 / 17.5 / 19]     & 600.1 & 0.4 & 18\,500 \\
+\texttt{dsjc125.9}      & [46 / 52.0 / 60]     & 600.2 & 0.3 & 16\,000 \\
+\texttt{dsjc250.1}      & [79 / 92.0 / 107]    & 600.0 & 0.5 & 17\,200 \\
+\texttt{dsjc250.5}      & [313 / 325.0 / 340]  & 600.3 & 0.4 & 15\,800 \\
+\texttt{dsjc250.9}      & [233 / 245.5 / 260]  & 601.2 & 0.4 & 15\,500 \\
+\texttt{flat300\_26\_0} & [514 / 528.0 / 545]  & 601.0 & 0.4 & 15\,100 \\
+\texttt{le450\_15c}     & [707 / 722.0 / 740]  & 600.5 & 0.5 & 14\,600 \\
+\texttt{dsjc1000.5}     & [2977 / 3010 / 3050] & 601.6 & 0.4 & 11\,000 \\
+\texttt{dsjc1000.9}     & [2014 / 2050 / 2095] & 604.7 & 0.5 & 9\,200  \\
+\texttt{C2000.5}        & [6685 / 6720 / 6780] & 600.3 & 0.5 & 5\,800  \\
+\texttt{C4000.5}        & [15320 / 15380 / 15450] & 616.3 & 0.6 & 2\,900 \\
+\bottomrule
+\end{tabular}
+\caption{Performances du Recuit Simulé.}
+\label{tab:resultats_recuit}
+\end{table}
+
+\subsection{Analyse des résultats}
+
+L'analyse de ces résultats met en évidence des comportements différents selon les algorithmes et la structure des instances :
+
+\begin{itemize}
+    \item \textbf{Heuristique DSATUR :}
+    L'exécution de DSATUR est très rapide. Elle fournit une solution de départ bien meilleure qu'une affectation aléatoire, mais sur des graphes contraints ou de grande taille, elle laisse un nombre important de conflits (par exemple 445 conflits sur \texttt{dsjc1000.5}). Il faut donc une métaheuristique supplémentaire pour trouver une meilleure coloration. 
+    Au contraire, l'algorithme Tabou démarre d'une solution aléatoire. C'est un choix qui permet de maximiser la diversité de la solution initiale et d'éviter d'enfermer la recherche dans un biais heuristique (une cuvette dans laquelle le minimum total ne se trouve pas forcément).
+
+    \item \textbf{Recuit simulé :}
+    Le recuit simulé affiche les performances les plus faibles du benchmark. --> mauvais paramètres
+    \item \textbf{Recherche Tabou :}
+    La recherche tabou est très efficace, en particulier sur les graphes de taille moyenne et grande. Elle résout parfaitement \texttt{dsjc125.1} et \texttt{dsjc250.1} en seulement quelques secondes (3.4 s et 2.6 s). 
+    Sur les instances avec de nombreux noeuds ou très denses comme \texttt{dsjc1000.5}, \texttt{dsjc1000.9} ou \texttt{le450\_15c}, elle obtient les meilleurs résultats (seulement 18 conflits sur \texttt{le450\_15c} contre 151 pour GVNS).
+    
+    \item \textbf{GVNS / VND :}
+    La méthode GVNS combinée à la descente VND affiche une efficacité remarquable sur les graphes de petite et moyenne taille :
+    \begin{itemize}
+        \item Sur \texttt{dsjc125.1} et \texttt{dsjc125.9}, elle trouve une solution optimale sans conflit en seulement \textbf{0.1 seconde}.
+        \item Sur \texttt{dsjc250.5}, \texttt{dsjc250.9} et la très grande instance \texttt{C4000.5}, elle est plus efficace que la recherche tabou en obtenant un nombre de conflits inférieur.
+    \end{itemize}
+    Cette efficacité est due à l'utilisation de DSATUR pour l'initialisation, et du voisinage $V_2$ qui permet de débloquer les minima locaux du 1-changement, et du mécanisme de backtracking qui évite de stagner indéfiniment dans une même vallée.
+\end{itemize}
+
+\subsection{Conclusion et perspectives}
+En conclusion, DSATUR et une recherche à voisinages variables (VND / VNS) permet une convergence rapide sur de petites instances (ou à faible densité). Mais pour les grands graphes ($n \ge 1000$) ou les graphes avec des sommets très contraints (densité importante), la recherche tabou semble plus efficace.
+
+--> perspective d'amélioration :  initialiser la recherche tabou avec une version randomisée de DSATUR (tirer au sort parmi les 3 sommets les plus saturés ou parmi les meilleures couleurs disponibles par exemple)
+\end{document}

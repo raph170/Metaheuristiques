@@ -7,7 +7,6 @@ function liste_fichiers_graphes(dir)
     return fichiers
 end
 
-
 function lecture_graphe_avec_voisins(path::String)
     A = nothing
     n = nothing

@@ -7,7 +7,7 @@ include("VND_VNS.jl")
 
 using Random
 
-dir = "C:/Users/rapha/OneDrive/Bureau/ENPC/3A/MPRO/Métaheuristiques/Metaheuristiques/data/graphs/"
+dir = "data/graphs"
 
 couleurs = Dict(
     "flat300_26_0.col.txt" => [26,13], "le450_15c.col.txt" => [15,8], "dsjc125.1.col.txt" => [5],
@@ -22,13 +22,15 @@ couleurs = Dict(
 # C2000.5.col.txt 30 
 # c 4000 80
 
+# nom_fichier = "dsjc125.1.col.txt"
 nom_fichier = "le450_15c.col.txt"
+# nom_fichier = "C2000.5.col.txt"
 
 avant_graphe = time()
 A, adj, n, nombre_aretes = lecture_graphe_avec_voisins(dir * "/" * nom_fichier)
 apres_graphe = time()
 println("temps creation matrice adjacence : ", apres_graphe - avant_graphe)
-k = couleurs[nom_fichier][1]
+k = couleurs[nom_fichier][1]+1
 
 
 # solution_aleatoire = aleatoire(A,k)
@@ -126,8 +128,8 @@ end
 ######### VND #########
 #######################
 if meta_heuristique == "VND"
-    sol, conflits = VNS(A, k; adj=adj, max_iter=2000, k_max=50)
-    println(conflits)
+    sol, conflits = VNS(A, k; adj=adj, max_iter=2000, k_max=50, limite_temps=limite_temps)
+    println("Conflits finaux VND : ", conflits)
 end
 
 

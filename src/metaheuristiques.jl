@@ -1,6 +1,6 @@
 include("voisinages.jl")
 
-function recuit_simule(A, adj, k, T, heuristique, voisinage, mu; limite_temps = 600, log=false)
+function recuit_simule(A, adj, k, T, heuristique, voisinage, mu; limite_temps = 600, log=false, full_output=false)
     # recuit simulé choix aléatoire voisin dans le voisinage considéré
     # les nombres de conflits sont calculés pour toute la solution à chaque itération, 
     # calculer le cout incremental plutot que le cout total n'ameliore pas le temps de résolution, au contraire, c est un peu plus long
@@ -10,17 +10,17 @@ function recuit_simule(A, adj, k, T, heuristique, voisinage, mu; limite_temps = 
     meilleure_solution = deepcopy(solution)
     nb_conflit_min = nb_conflit
     nb_conflit_initial = nb_conflit
+    temps_meilleur = 0.0
     n_iter = 1
     duree_resolution = time() - avant_boucle
     while duree_resolution < limite_temps
-        debut_boucle = time()
         if nb_conflit_min == 0
             break
         end
         if log 
             println("Iter ", n_iter, "||conflits courants : ",nb_conflit,"||meilleurs conflits : ",nb_conflit_min, "||Temps : ", round(duree_resolution; digits = 2))
         end
-        voisin, avant_changements = voisinage(solution)
+        voisin, avant_changements = voisinage(solution, k)
         nb_conflit_voisin = nb_conflits(voisin,adj)
         delta = nb_conflit_voisin - nb_conflit
         if log 
@@ -35,6 +35,7 @@ function recuit_simule(A, adj, k, T, heuristique, voisinage, mu; limite_temps = 
             if nb_conflit < nb_conflit_min
                 nb_conflit_min = nb_conflit
                 meilleure_solution = voisin
+                temps_meilleur = time() - avant_boucle
                 if log 
                     println("meilleure solution améliorée à l'itération ", n_iter)
                     println("cout de cette solution : ",nb_conflit_min)
@@ -56,9 +57,14 @@ function recuit_simule(A, adj, k, T, heuristique, voisinage, mu; limite_temps = 
         end
         T = mu*T
         n_iter += 1
-        duree_resolution += time() - avant_boucle
+        duree_resolution = time() - avant_boucle
     end
-    return meilleure_solution, nb_conflit_initial, nb_conflit_min, T, duree_resolution
+    vitesse = n_iter / max(duree_resolution, 1e-6)
+    if full_output
+        return meilleure_solution, nb_conflit_initial, nb_conflit_min, T, duree_resolution, temps_meilleur, vitesse
+    else
+        return meilleure_solution, nb_conflit_initial, nb_conflit_min, T, duree_resolution
+    end
 end
 
 
