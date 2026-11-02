@@ -102,7 +102,7 @@ Le voisinage par $p$-changements (noté $V_p$ ou \textit{p-color}) généralise 
 |V_p| = \binom{n}{p} \cdot (k - 1)^p
 \]
 Pour $p = 2$ (\textit{2-color}), la taille est $|V_2| = \binom{n}{2}(k - 1)^2 = \frac{n(n-1)}{2}(k-1)^2$. Pour $p = 3$ (\textit{3-color}), la taille atteint $\binom{n}{3}(k-1)^3$.\\
-Ce voisinage croît très fortement avec $p$. C'est pourquoi il est soit restreint aux sommets en conflit (comme dans le VND), soit utilisé comme perturbation aléatoire (\textit{shaking} dans le VNS).
+La taille de ce voisinage croît très fortement avec $p$. C'est pourquoi il est soit restreint aux sommets en conflit (comme dans le VND), soit utilisé comme perturbation aléatoire (\textit{shaking} dans le VNS).
 
 \subsection{Voisinage 2-échange (2-swap)}
 Ce voisinage consiste à échanger la couleur de 2 sommets $u$ et $v$. Si dans la solution courante $u$ possède la couleur $c$ et $v$ possède la couleur $c'$, dans la solution voisine $u$ prend la couleur $c'$ et $v$ prend la couleur $c$.\\
@@ -259,7 +259,7 @@ Pour que la descente soit plus performante, nous avons mis en place deux modific
 \end{enumerate}
 
 \section{Métaheuristiques}
-Pour les différentes métaheuristiques, la première fonction objectif à minimiser correspond au nombre de conflits de la solution considérée.
+Pour les différentes métaheuristiques, la première fonction objectif à minimiser utilisée correspond au nombre de conflits de la solution considérée.
 
 \subsection{Méthode de descente et recherche à voisinages variables (VND / VNS)}
 
@@ -324,40 +324,43 @@ De plus, un timer global de temps limite (fixé à 600 secondes) permet d'e stop
     \item \textbf{Longueur maximale de plateau lors de la descente : } 25 mouvements consécutifs sans cycle et sans amélioration.
     \item \textbf{Seuil de stagnation VNS : } 25 itérations sans progrès avant réinitialisation.
     \item \textbf{Seuil de backtracking : } 5 stagnations consécutives sur une même branche avant retour à une solution de l'historique.
-    \item \textbf{Limite de temps : } 600 secondes par instance.
 \end{itemize}
 
 \subsection{Recuit simulé}
-La première métaheuristiques testée est le recuit simulé.
-La solution initiale est déterminée par l'heuristique aléatoire. Le voisinage retenu est le 1-changement. A chaque itération on sélectionne un sommet aléatoirement dont change la couleur (aléatoirement également). On détermine donc un seul voisin aléatoirement et non tout le voisinage.
+Dans notre implémentation du recuit simulé, une solution initiale est déterminée par l'heuristique aléatoire. Le voisinage retenu est le 1-changement. A chaque itération on sélectionne un sommet aléatoirement dont on change la couleur (aléatoirement également). On détermine donc un seul voisin aléatoirement et non tout le voisinage.
+
+\noindent Si cette solution voisine est de meilleur coût (plus faible nombre de conflits), elle est acceptée. Sinon, elle est acceptée avec une probabilité d'acceptation $p = \exp{\frac{-\Delta_f}{T}}$ (où $\Delta_f = \text{coût voisin} - \text{coût solution courante}$) et rejetée avec probabilité 1-p.
+
+A chaque itération, la température décroit selon une suite géométrique : $T_{Niter + 1} = \mu*T_{Niter}$.
+
 La valeur de la température et du coefficient $\mu$ ont été choisis expérimentalement en lançant des résolutions sur différents graphes.
-Nous avons choisi $T = 100$ et $\mu = 0.9$.
+Nous avons choisi $T = 200$ et $\mu = 0.99$.
 Voici les résultats sur quelques graphes, relativement petits.
 
 \subsection{Recherche tabou}
 
-La deuxième métaheuristique testée est la recherche tabou.
-De même que pour le recuit simulé, la solution initiale est déterminée par une heuristique aléatoire.
-Plusieurs structures de voisinage ont été utilisées au début, mais nous avons rapidement décidé de conserver le voisinage 1-changement.
+De même que pour le recuit simulé, lors de la recherche tabou, la solution initiale est déterminée par l'heuristique aléatoire.
+Plusieurs structures de voisinage ont été utilisées au début, mais nous avons rapidement décidé de conserver le voisinage 1-changement qui semblait être le plus adapté.
 
 Nous avons commencé par réaliser une recherche tabou classique : à chaque itération, on détermine le meilleur voisin parmi tous les voisins de la solution courante. Cette méthode, bien qu'efficace, est très coûteuse dès que l'instance devient grande ($|V| = n(k-1)$).
 
-Une alternative possible est de sélectionner un voisin (couple sommet-couleur) de la façon suivante : on sélectionne un sommet aléatoirement parmi tous les sommets en conflit (de la même couleur qu'au moins un de leurs voisins), puis, pour ce sommet, on sélectionne la couleur qui mène au plus petit nombre de conflits. La taille du voisinage exploré est donc désormais $|V| = k-1$.
+Une alternative possible est de sélectionner un voisin (couple sommet-couleur) de la façon suivante : on sélectionne un sommet aléatoirement parmi tous les sommets en conflit (incidents à au moins une arête conflictuelle), puis, pour ce sommet, on sélectionne la couleur qui mène au plus petit nombre de conflits. La taille du voisinage exploré est donc désormais $|V| = k-1$.
 Cette méthode permet d'accélérer l'exploration des voisins, mais il faut en contrepartie effectuer beaucoup plus d'itérations pour améliorer la solution courante.
 
-Un compromis entre ces deux méthodes consiste donc à déterminer un échantillon aléatoire de sommets en conflit et à sélectionner le meilleur voisin parmi l'ensemble des voisins associés à ces sommets.
+Un compromis entre ces deux méthodes consiste à déterminer un échantillon aléatoire de sommets en conflit et à sélectionner le meilleur voisin parmi l'ensemble des voisins associés à ces sommets.
 La taille du voisinage exploré est ainsi $|V| = |\text{échantillon}|(k-1)$.
 
-Cette méthode s'est révélée beaucoup plus performante que les deux premières.
+\noindent Cette méthode s'est révélée beaucoup plus performante que les deux premières.
+\vspace{0.1 cm}\\
 
-Pour accélérer davantage la résolution, il est également important de ne pas recalculer le coût de chaque voisin depuis zéro, mais de calculer son coût incrémental. Pour cela, on introduit plusieurs structures supplémentaires :
+Pour accélérer davantage la résolution, il est également important de ne pas calculer le coût de chaque voisin de zéro, mais de calculer son coût incrémental : le coût du passage de la solution courante à ce voisin. Pour cela, on introduit plusieurs structures supplémentaires :
 \begin{itemize}
     \item Un tableau $C$ de taille $n \times k$ associant à chaque couple sommet-couleur $(u,c)$ le nombre de voisins de $u$ ayant la couleur $c$.
     \item Un vecteur contenant les sommets actuellement en conflit, afin de ne considérer que ces sommets lors de la sélection des candidats.
     \item Un tableau de positions permettant de retrouver en temps constant la position d'un sommet dans ce vecteur. Il permet notamment d'ajouter ou de retirer un sommet de l'ensemble des sommets en conflit en $O(1)$, sans avoir à parcourir le vecteur.
 \end{itemize}
 
-Lorsqu'un sommet $u$ change de couleur, seules les informations relatives à ses voisins doivent être mises à jour dans $C$. Il n'est donc pas nécessaire de recalculer les nombres de conflits de l'ensemble des sommets. Le coût d'un changement de couleur peut ainsi être évalué à partir des valeurs déjà stockées dans $C$.
+\noindent Lorsqu'un sommet $u$ change de couleur, seules les informations relatives à ses voisins doivent être mises à jour dans $C$. Il n'est donc pas nécessaire de recalculer les nombres de conflits de l'ensemble des sommets. Le coût d'un changement de couleur peut ainsi être évalué à partir des valeurs déjà stockées dans $C$.
 
 Enfin, afin d'éviter de revenir trop rapidement sur des solutions déjà explorées, on utilise une liste tabou. Elle mémorise temporairement les changements de couleur interdits : lorsqu'un sommet quitte une couleur, le retour à cette couleur lui est interdit pendant un certain nombre d'itérations. Cette durée correspond à la taille de la liste tabou.
 La liste tabou est en réalité une matrice de taille $n*k$ avec $\text{tabou}[u,c]$ valant l'itération jusqu'à laquelle le couple (u,c) reste tabou.
@@ -371,31 +374,68 @@ Pour cela, lorsque le nombre d'itérations sans amélioration dépasse un certai
 Si de plus, aucune amélioration n'a lieu après un certain nombre de perturbations forcées, on augmente la taille de l'échantillon de sommets en conflits étudiés à chaque itération, ainsi que le nombre de changements autorisés p lors des phases de perturbation.
 Dès qu'une amélioration est faite, ces paramètres reprennent leur valeur initiale.\\
 On ajoute donc en quelque sorte une recherche à voisinage variable au sein de notre recherche tabou.
-
-\textbf{Valeurs des hyper-paramètres : }\\
-
+\vspace{0.3cm}\\
+\noindent \textbf{Valeurs des hyper-paramètres : }
+\vspace{-0.3cm}\\
 \begin{itemize}
     \item \textbf{Longueur tabou : } Le premier hyper-paramètre est la longueur tabou. \\
     Une première méthode est de déterminer expérimentalement une valeur fixe qui dépend du nombre de sommets du graphe et de sa densité. Nous avons choisis des longueur de 10 à 100 selon la taille des graphes.\\
     Une autre méthode est de sélectionner dynamiquement la longueur tabou au cours de la résolution. La valeur retenue est $\text{len_tabou} = 0.6*\text{nb_conflits} + l$ où $l$ est tiré aléatoirement entre 0 et 9.
     \item \textbf{taille échantillon : } Le nombre de sommets avec conflits explorés à chaque itération est initialisé à 10 puis augmente par incrément de 5 après un certain nombre de perturbations forcées sans amélioration. Un seuil est fixé à 30.
     \item \textbf{nombre de changements effectuées lors des phases de perturbations forcées : } Le nombre de changements effectués est initialisé à 5 et augmente par incrément de 5 après un certain nombre de perturbations forcées sans amélioration. Un seuil est également fixé à 30.
+    \item \textbf{Nombre de perturbations forcées sans amélioration :} Après 3 phases de perturbation forcée sans amélioration, la taille du voisinage exploré est augmentée.
 \end{itemize}
 
 \section{Fonction objectif alternative}
-Jusqu'à présent, la fonction objectif utilisée correspondait au nombre de conflits de la solution considérée. Avec cette fonction objectif, une solution avec 5 sommets ayant 1 conflit chacun a le même coût qu'une solution avec 1 sommet ayant 5 conflits.
+Jusqu'à présent, la fonction objectif utilisée représentait le nombre de conflits dans la solution considérée : 
+
+\[
+V_1 = \frac{1}{2}  \sum_{u \in [\![1; n]\!]}c(u)  \quad \quad \text{où $c(u)$ désigne le nombre de conflits du sommet $u$.}
+\]
+
+\noindent Avec cette fonction objectif, une solution avec 5 sommets ayant chacun 1 conflit a le même coût qu'une solution avec 1 sommet ayant 5 conflits.\\
 Pour pénaliser davantage les solutions avec des sommets incidents à un grand nombre d'arêtes conflictuelles, nous proposons une fonction objectif alternative : 
-$V_{solution} = sum_{u \in [\![1; n]\!]}(C(u)^2)$ où $C(u)$ désigne le nombre de conflits du sommet $u$.
+\[
+V_2 = \sum_{u \in [\![1; n]\!]}c(u)^2 
+\]
 
-\textbf{Remarque : } \textit{Avec cette nouvelle fonction objectif, chaque arête uv en conflit est comptée 2 fois, la première lors du calcul de $C(u)^2$, la deuxième lors du calcul de $C(v)^2$ }
+\noindent \textbf{Remarque : } \textit{Avec cette nouvelle fonction objectif, chaque arête uv en conflit est comptée 2 fois, la première lors du calcul de $c(u)^2$, la deuxième lors du calcul de $c(v)^2$. }
+\vspace{-0.1cm}\\
 
-En reprenant l'exemple précédent, une solution avec 5 sommets ayant 1 conflit a un nouveau coût de $10*1^2 = 10$ et celle avec 1 sommet ayant 5 conflits à un nouveau coût de $5^2 + 5*1^2 = 30$
+\noindent En reprenant l'exemple précédent, une solution avec 5 sommets ayant 1 conflit a un nouveau coût de $10*1^2 = 10$ et celle avec 1 sommet ayant 5 conflits a un nouveau coût de $5^2 + 5*1^2 = 30$.
 
-La mis à jour incrémental des coût lors de l'exploration d'une solution voisine est donc légèrement plus compliquée avec la fonction objectif alternative.
-Lors du changement de couleur d'un sommet u, il faut en effet considérée le coût de changement pour le sommet u : $\delta_1 = C[u,c_2]^2 - C[u,c_1]^2$ où $C[u,c_1]$ désigne le nombre de voisins de u de couleur c_1, c_1 etant l'ancienne couleur de u et c_2 la couleur associée à la solution voisine.
-Mais il faut également considéré le coût de changement pour tous les sommets v adjacents à u : 
-$\delta_2 = \sum_{v \in N(u)}(c_{\text{apres}}[v] - c_{\text{avant}}[v])$ où $c_{apres}[v]$ vaut le nombre d'arêtes conflictuelles incidentes à v après le changement de couleur et $c_{avant}[v]$ le nombre d'arêtes conflictuelles incidentes à v avant le changement de couleur.
+\vspace{0.5cm}\\
+L'inconvénient de cette nouvelle fonction objectif est que la mise à jour incrémental des coûts lors de l'exploration d'une solution voisine est légèrement plus compliquée et demande plus de calculs qu'avec la première fonction objectif.
 
+\noindent Lors du changement de couleur d'un sommet u, il faut en effet considérer le coût de changement pour ce sommet : 
+\[
+\delta_1 = C[u,c_2]^2 - C[u,c_1]^2 \\ 
+
+\noindent \text{où }C[u,c1] \text{ désigne le nombre de voisins de u de couleur c ; } c_1 \text{l'ancienne couleur de u et } c_2 \\
+\noindent \text{ la couleur associée à la solution voisine.}
+\]
+\\
+
+\noindent Mais il faut également considérer le coût de changement pour tous les sommets v adjacents à u : 
+\[
+\delta_2 = \sum_{v \in N(u)}c_{\text{apres}}(v) - c_{\text{avant}}(v)\\ 
+
+\noindent \text{où $c_{apres}(v)$ correspond au nombre d'arêtes conflictuelles incidentes à v après le changement de couleur}\\
+\text{et $c_{avant}(v)$ le nombre d'arêtes conflictuelles incidentes à v avant le changement de couleur.}
+\]
+\vspace{-1cm}\\
+\noindent Le coût incrémental du voisin vaut donc 
+\[
+\delta = \delta_1 + \delta_2
+\]
+
+En comparaison le coût incrémental d'un voisin en utilisant la première fonction objectif vaut : 
+\[
+\delta = C[u,c_2] - C[u,c_1]
+\]
+Pour chaque voisin exploré, le calcul de ce coût se fait donc en $O(1)$ pour la fonction objectif classique et en $O(\text{Deg}(u))$ pour la fonction objectif alternative.
+
+Etant donné que les différentes métaheuristiques implémentées explorent un grand nombre de voisins lors de la résolution, l'utilisation de cette fonction objectif peut donc être remise en cause.
 \section{Résultats}
 
 Afin d'évaluer et de comparer les performances des différentes méthodes développées, nous avons réalisé des séries de tests sur les 11 graphes proposés.\\
@@ -415,7 +455,7 @@ Les paramètres de chaque algorithme ont été choisis expérimentalement en s'a
 \addlinespace
 \textbf{Recuit Simulé} & Solution initiale aléatoire, température initiale $T_0 = 200$, coefficient de décroissance $\mu = 0.99$ ($T \leftarrow \mu T$), voisinage 1-changement aléatoire, arrêt à 0 conflit ou temps limite ($600\text{ s}$). \\
 \addlinespace
-\textbf{Recherche Tabou} & Solution initiale aléatoire, taille d'échantillon des sommets en conflit $= 20$, taille de perturbation $p = 5$, durée tabou dynamique $\text{len\_tabou} = \lfloor 0.6 \times \text{nb\_conflits} \rfloor + \text{rand}(0, 9)$ (ajustée entre 10 et 100 selon la taille et densité du graphe), seuil de stagnation avant perturbation $= 2500$ itérations, temps limite $= 600\text{ s}$. \\
+\textbf{Recherche Tabou} & Solution initiale aléatoire, taille d'échantillon des sommets en conflit $= 20$, taille de perturbation $p = 5$, durée tabou dynamique $\text{len\_tabou} = \lfloor 0.6 \times \text{nb\_conflits} \rfloor + \text{rand}(0, 9)$, seuil de stagnation avant perturbation $= 2500$ itérations, nombre de phase de perturbation max avant augmentation du voisinage : 3, temps limite $= 600\text{ s}$. \\
 \addlinespace
 \textbf{GVNS / VND} & Solution initiale DSATUR, descente VND alternant $V_1$ (1-color) et $V_2$ (2-color), longueur maximale de plateau sans cycle $= 25$, secousses VNS de force $k \in [\![1, 50]\!]$ ciblées sur les conflits, seuil de stagnation de branche $= 25$, seuil de backtracking persistant $= 5$, temps limite $= 600\text{ s}$. \\
 \bottomrule
@@ -468,6 +508,9 @@ L'énoncé demande de donner pour chaque instance le nombre de conflits (\textbf
 \subsection{Tableaux récapitulatifs détaillés par algorithme}
 Pour chaque algorithme, on résume le nombre de conflits (\textbf{min}, \textbf{moy}, \textbf{max}), le temps total de résolution ($t_{\text{total}}$), le temps pour parvenir à la meilleure solution ($t_{\text{best}}$), ainsi que la vitesse de traitement (nombre de solutions évaluées par seconde).
 
+\textbf{Remarque sur le calcul des temps :} Pour l'ensemble des métaheuristiques stochastiques (Recuit Simulé, Recherche Tabou, GVNS / VND), les valeurs de $t_{\text{total}}$, $t_{\text{best}}$ et de la vitesse correspondent aux moyennes calculées sur les 3 répétitions différentes. Lorsqu'un algorithme atteint 0 conflit à chacune des 3 répétitions, chaque exécution s'interrompt immédiatement dès la découverte de la coloration valide, ce qui donne $\overline{t_{\text{best}}} = \overline{t_{\text{total}}}$. \\
+Pour l'heuristique de descente locale dans $V_1$ qui est strictement déterministe, les temps correspondent à l'exécution unique.
+
 \subsubsection{Recherche Tabou}
 Le tableau~\ref{tab:resultats_tabou} montre les résultats obtenus avec la recherche tabou.
 \begin{table}[H]
@@ -478,8 +521,8 @@ Le tableau~\ref{tab:resultats_tabou} montre les résultats obtenus avec la reche
 \toprule
 \textbf{Instance} & \textbf{Conflits [min / moy / max]} & \textbf{$t_{\text{total}}$ (s)} & \textbf{$t_{\text{best}}$ (s)} & \textbf{Solutions / s} \\
 \midrule
-\texttt{dsjc125.1}      & [0 / 0.0 / 0]       & 1.8   & 0.1   & 1\,286\,378 \\
-\texttt{dsjc125.9}      & [0 / 0.0 / 0]       & 76.5  & 220.0 & 3\,651\,308 \\
+\texttt{dsjc125.1}      & [0 / 0.0 / 0]       & 1.8   & 1.8   & 1\,286\,378 \\
+\texttt{dsjc125.9}      & [0 / 0.0 / 0]       & 76.5  & 76.5  & 3\,651\,308 \\
 \texttt{dsjc250.1}      & [0 / 0.3 / 1]       & 173.6 & 0.8   & 2\,439\,260 \\
 \texttt{dsjc250.5}      & [3 / 5.3 / 7]       & 300.0 & 67.5  & 3\,055\,974 \\
 \texttt{dsjc250.9}      & [3 / 3.3 / 4]       & 300.0 & 10.1  & 3\,389\,855 \\
@@ -508,7 +551,7 @@ Le tableau~\ref{tab:resultats_vns} montre les résultats obtenus par la méthode
 \midrule
 \texttt{dsjc125.1}      & [0 / 0.0 / 0]       & 0.1   & 0.1   & 19\,101\,292 \\
 \texttt{dsjc125.9}      & [0 / 0.0 / 0]       & 0.3   & 0.3   & 40\,428\,253 \\
-\texttt{dsjc250.1}      & [0 / 0.0 / 0]       & 154.5 & 234.0 & 20\,150\,941 \\
+\texttt{dsjc250.1}      & [0 / 0.0 / 0]       & 154.5 & 154.5 & 20\,150\,941 \\
 \texttt{dsjc250.5}      & [7 / 8.3 / 9]       & 300.0 & 84.1  & 21\,275\,378 \\
 \texttt{dsjc250.9}      & [1 / 1.7 / 2]       & 300.0 & 8.2   & 31\,740\,367 \\
 \texttt{flat300\_26\_0} & [66 / 67.3 / 69]   & 300.0 & 58.1  & 29\,233\,477 \\
@@ -552,7 +595,7 @@ Le tableau~\ref{tab:resultats_descente} montre les performances de la descente g
 \end{table}
 
 \subsubsection{Recuit Simulé}
-Le tableau~\ref{tab:resultats_recuit} montre les résultats obtenus par le recuit simulé. On remarque que $t_{\text{best}} \le 0.5\text{ s}$ sur l'ensemble des instances : en raison de la décroissance géométrique $\mu = 0.99$, la température descend sous $10^{-4}$ dès les 1500 premières itérations, ce qui piège immédiatement la recherche.
+Le tableau~\ref{tab:resultats_recuit} montre les résultats obtenus par le recuit simulé. En raison de la décroissance géométrique continue ($\mu = 0.99$), la température descend rapidement, ce qui empêche l'acceptation de mouvements dégradants et freine la progression dès que la recherche atteint un bassin non optimal.
 
 \begin{table}[H]
 \centering
