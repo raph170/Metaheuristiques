@@ -1,9 +1,9 @@
 using Random
 Random.seed!(7)
 
-function aleatoire(A,k)
+function aleatoire(adj,k)
     # affectation d'une couleur aléatoire à chaque sommet du graphe
-    n = size(A)[1]
+    n = size(adj)[1]
     solution = Dict()
     for u in 1:n
         solution[u] = rand(1:k)
@@ -11,10 +11,10 @@ function aleatoire(A,k)
     return solution
 end
 
-function greedy(A, adj, k)
+function greedy(adj, k)
     # affectation de la première couleur disponible, les sommets sont parcourus dans 
     # l'ordre numérique
-    n = size(A)[1]
+    n = size(adj)[1]
     solution = Dict(1=>1)
     for u in 2:n
         couleurs = 1:k
@@ -32,10 +32,10 @@ function greedy(A, adj, k)
 end
 
 
-function greedy_deg(A, adj, k,log=false)
+function greedy_deg(adj, k,log=false)
     # affectation de la première couleur disponible, les sommets sont parcourus dans 
     # l'ordre des degrés décroissants
-    n = size(A)[1]
+    n = size(adj)[1]
     Deg = Dict(u => length(adj[u]) for u in 1:n)
     sommets_ordonnes = sort(collect(Deg), by = x -> x[2], rev = true)
     solution = Dict()

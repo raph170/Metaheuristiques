@@ -1,11 +1,11 @@
 include("voisinages.jl")
 
-function recuit_simule(A, adj, k, T, heuristique, voisinage, mu; limite_temps = 600, log=false, full_output=false)
+function recuit_simule(adj, k, T, heuristique, voisinage, mu; limite_temps = 600, log=false, full_output=false)
     # recuit simulé choix aléatoire voisin dans le voisinage considéré
     # les nombres de conflits sont calculés pour toute la solution à chaque itération, 
     # calculer le cout incremental plutot que le cout total n'ameliore pas le temps de résolution, au contraire, c est un peu plus long
     avant_boucle = time()
-    solution = heuristique(A, k) #solution initiale
+    solution = heuristique(adj, k) #solution initiale
     nb_conflit = nb_conflits(solution,adj)
     meilleure_solution = deepcopy(solution)
     nb_conflit_min = nb_conflit
@@ -34,8 +34,8 @@ function recuit_simule(A, adj, k, T, heuristique, voisinage, mu; limite_temps = 
             nb_conflit = nb_conflit_voisin
             if nb_conflit < nb_conflit_min
                 nb_conflit_min = nb_conflit
-                meilleure_solution = voisin
                 temps_meilleur = time() - avant_boucle
+                meilleure_solution = deepcopy(voisin)
                 if log 
                     println("meilleure solution améliorée à l'itération ", n_iter)
                     println("cout de cette solution : ",nb_conflit_min)
@@ -67,12 +67,15 @@ function recuit_simule(A, adj, k, T, heuristique, voisinage, mu; limite_temps = 
     end
 end
 
+# Surcharge pour rétro-compatibilité si la matrice A est fournie
+recuit_simule(A, adj, k, T, heuristique, voisinage, mu; kwargs...) = recuit_simule(adj, k, T, heuristique, voisinage, mu; kwargs...)
 
-function recherche_tabou(A, adj, n, k, heuristique, voisinage, len_tabou ; taille_echantillon=5, taille_voisinage=5, n_iter_max_sans_amelioration=2500, n_perturbation_max_sans_amelioration = 3, limite_temps=600, log=false)
+
+function recherche_tabou(adj, n, k, heuristique, voisinage, len_tabou ; type_obj = "classique", taille_echantillon=5, taille_voisinage=5, n_iter_max_sans_amelioration=2500, n_perturbation_max_sans_amelioration = 3, limite_temps=600, log=false)
     taille_echantillon_initiale = taille_echantillon
     taille_voisinage_initiale = taille_voisinage
     avant_resolution = time()
-    solution = heuristique(A, k) # solution initiale
+    solution = heuristique(adj, k) # solution initiale
     meilleure_solution = deepcopy(solution)
     temps_meilleure_solution = time() - avant_resolution
     N_solutions = 0
@@ -88,11 +91,21 @@ function recherche_tabou(A, adj, n, k, heuristique, voisinage, len_tabou ; taill
     # nombre de conflits par sommet
     conflits = [C[u, solution[u]] for u in 1:n]
     # Nombre total de conflits
-    nb_conflit = sum(conflits) ÷ 2
+    if type_obj == "classique"
+        nb_conflit = sum(conflits) ÷ 2
+    elseif type_obj == "pondéré"
+        nb_conflit_reel = sum(conflits) ÷ 2
+        nb_conflit = sum([conflits[u]^2 for u in 1:n]) # fonction objectif pour pénaliser les sommets ayant un grand nombre de conflits
+    else
+        error("type d'objectif non valide : $type_obj")
+    end
     nb_conflit_initial = nb_conflit
     nb_conflit_min = nb_conflit
     if log
         println("nombre de conflits initial : ", nb_conflit_initial)
+        if type_obj == "pondéré"
+            println("nombre de conflits réels initial : ", nb_conflit_reel)
+        end
     end
 
     # Ensemble des sommets en conflit
@@ -155,7 +168,11 @@ function recherche_tabou(A, adj, n, k, heuristique, voisinage, len_tabou ; taill
             for u in 1:n
                 conflits[u] = C[u, solution[u]]
             end
-            nb_conflit = sum(conflits) ÷ 2
+            if type_obj == "classique"
+                nb_conflit = sum(conflits) ÷ 2
+            else
+                nb_conflit = sum([conflits[u]^2 for u in 1:n]) # fonction objectif pour pénaliser les sommets ayant un grand nombre de conflits
+            end
 
             empty!(sommets_avec_conflits)
             fill!(positions, 0)
@@ -188,12 +205,23 @@ function recherche_tabou(A, adj, n, k, heuristique, voisinage, len_tabou ; taill
 
         for u in sommets_choisis
             ancienne_couleur = solution[u]
-            cout_actuel = C[u, ancienne_couleur]
+            if type_obj == "classique"
+                cout_actuel = C[u, ancienne_couleur]
+            end
             for c in 1:k
                 if c == ancienne_couleur
                     continue
                 end
-                delta = C[u,c] - cout_actuel
+                if type_obj == "classique"
+                    delta = C[u,c] - cout_actuel
+                else
+                    delta = C[u, c]^2 - C[u, ancienne_couleur]^2
+                    for v in adj[u]
+                        conflits_v = conflits[v]
+                        conflits_v_apres = conflits_v + Int(solution[v]==c) - Int(solution[v]==ancienne_couleur)
+                        delta += conflits_v_apres^2 - conflits_v^2
+                    end
+                end
                 # Meilleur mouvement, même s'il est tabou (utile dans le cas ou tous les voisins sont tabous)
                 if delta < meilleur_delta_global
                     meilleur_delta_global = delta
@@ -219,7 +247,6 @@ function recherche_tabou(A, adj, n, k, heuristique, voisinage, len_tabou ; taill
             meilleure_couleur = meilleure_couleur_globale
             meilleur_delta = meilleur_delta_global
         end
-
         u = meilleur_sommet
         ancienne_couleur = solution[u]
         nouvelle_couleur = meilleure_couleur
