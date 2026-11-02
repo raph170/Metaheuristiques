@@ -16,40 +16,39 @@ couleurs = Dict(
     "dsjc1000.9.col.txt" => [224,223,222,111] , "C2000.5.col.txt" => [147,146,73],
     "C4000.5.col.txt" => [261,260,130]
     )
-# dsjc250.9.col.txt : 30-50
-#  dsjc1000.5.col.txt 50
-# dsjc1000.9.col.txt 50 -80
-# C2000.5.col.txt 30 
-# c 4000 80
 
-# nom_fichier = "dsjc125.1.col.txt"
-nom_fichier = "le450_15c.col.txt"
-# nom_fichier = "C2000.5.col.txt"
-# nom_fichier = "flat300_26_0.col.txt"
+# Choix du graphe (a selectionner)
+nom_fichier = "dsjc125.1.col.txt"
 
 avant_graphe = time()
 A, adj, n, nombre_aretes = lecture_graphe_avec_voisins(dir * "/" * nom_fichier)
 apres_graphe = time()
 println("temps creation matrice adjacence : ", apres_graphe - avant_graphe)
+
+# CHoix du nombre de couleurs (a selectionner) :
 k = couleurs[nom_fichier][1]+1
 
-
+# Choix de l'heuristique pour la solution initiale (a selectionner)
 heuristique = aleatoire
+
+# Limite de temps (a selectionner)
 limite_temps = 120
 
-# meta_heuristique = "recherche tabou"
+# Choix de la méthode de résolution (a selectionner) :
+
+meta_heuristique = "recherche tabou"
 # meta_heuristique = "recherche tabou objectif pondéré"
-# meta_heuristique = "recherche tabou range len_tabou"
 # meta_heuristique = "recuit simulé"
-meta_heuristique = "VNS"
+# meta_heuristique = "VNS"
+# meta_heuristique = "VNS objectif pondéré"
 
 
 #####################
 ### RECUIT SIMULE ###
 #####################
 if meta_heuristique == "recuit simulé"
-    T = 100
-    mu = 0.9
+    T = 200 
+    mu = 0.99
     voisinage = _1_echange
 
     meilleure_solution, nb_conflits_initial, nb_conflits_final,T, duree_resolution = recuit_simule(adj, k, T, heuristique, voisinage, mu; limite_temps = limite_temps, log=true)
@@ -87,7 +86,7 @@ if meta_heuristique == "recherche tabou"
     println("durée de résolution : ", duree_resolution)
     println("temps pour trouver la meilleure solution : ", temps_meilleure_solution)
     println("Nombre de solutions explorées par seconde : ", vitesse_exploration)
-    println("Valeur de la fonction objectif pondérée : ", objectif_pondere(meilleure_solution, adj))
+    println("Valeur de la fonction objectif pondérée : ", objectif_pondere(meilleure_solution, adj, k))
 end
 
 if meta_heuristique == "recherche tabou objectif pondéré"
@@ -104,35 +103,59 @@ if meta_heuristique == "recherche tabou objectif pondéré"
 
 end
 
-if meta_heuristique == "recherche tabou range len_tabou"
-    voisinage = _p_echange
-    limite_temps = 180
-
-    len_tabous = [10,30,50,80,150,300]
-    resulats = Dict()
-    for len_tabou in len_tabous
-        println("len tabou = ", len_tabou)
-        Random.seed!(1234)
-        meilleure_solution, nb_conflits_initial, nb_conflits_final, duree_resolution, temps_meilleure_solution, vitesse_exploration = recherche_tabou(adj, n, k, heuristique, voisinage, len_tabou ; taille_echantillon=20, taille_voisinage=5, n_iter_max_sans_amelioration=5000, n_perturbation_max_sans_amelioration = 3, limite_temps=limite_temps, log=false)
-
-        resulats[len_tabou] = Dict("nb conflits initial" => nb_conflits_initial, "nb conflits final" => nb_conflits_final, "duree resolution" => duree_resolution, "temps meilleure solution" => temps_meilleure_solution, "vitesse exploration" => vitesse_exploration)
-        println("len tabou = ", len_tabou)
-        println("nb_conflit_initial : ", nb_conflits_initial )
-        println("nb_conflit_final : ", nb_conflits_final )
-        println("durée de résolution : ", duree_resolution)
-        println("temps pour trouver la meilleure solution : ", temps_meilleure_solution)
-        println("Nombre de solutions explorées par seconde : ", vitesse_exploration)
-    end
-    print(resulats)
-end
 
 
 #######################
 ######### VNS #########
 #######################
 if meta_heuristique == "VNS"
-    # type_obj="classique"
-    type_obj="pondere"
-    sol, conflits = VNS(A, k; adj=adj, max_iter=2000, k_max=100, limite_temps=limite_temps, type_obj=type_obj)
+    type_obj="classique"
+    meilleur_solution, nb_conflits_final = VNS(A, k; adj=adj, max_iter=2000, k_max=100, limite_temps=limite_temps, type_obj=type_obj)
     println("Conflits finaux VNS : ", conflits)
+end
+
+if meta_heuristique == "VNS objectif pondéré"
+    type_obj="pondere"
+    meilleur_solution, nb_conflits_final = VNS(A, k; adj=adj, max_iter=2000, k_max=100, limite_temps=limite_temps, type_obj=type_obj)
+    println("Conflits finaux VNS pondérée : ", conflits)
+end
+
+
+couleurs = Dict(
+     "dsjc125.1.col.txt" => [5],
+    "dsjc250.9.col.txt" => [72] ,
+    "dsjc1000.9.col.txt" => [224] , "C2000.5.col.txt" => [147],
+    "C4000.5.col.txt" => [261]
+    )
+
+
+limite_temps = 300
+for (graphe, liste_k) in couleurs
+    for k in liste_k
+        nom_fichier = graphe
+        avant_graphe = time()
+        A, adj, n, nombre_aretes = lecture_graphe_avec_voisins(dir * "/" * nom_fichier)
+        apres_graphe = time()
+        for type_obj in ["classique", "pondéré"]
+            Random.seed!(1234)
+            meilleure_solution, nb_conflits_initial, nb_conflits_final, duree_resolution, temps_meilleure_solution, vitesse_exploration = VNS(A, k; adj=adj, max_iter=2000, k_max=100, limite_temps=limite_temps, log = false, full_output=true, type_obj=type_obj)
+            if type_obj == "classique"
+                println("graphe : ",graphe, " | k = ", k, " | type d'objectif : ",type_obj)   
+                println("nb_conflit_initial : ", nb_conflits_initial )                                                                                    
+                println("nb_conflit_final : ", nb_conflits_final )
+                println("durée de résolution : ", duree_resolution)
+                println("temps pour trouver la meilleure solution : ", temps_meilleure_solution)
+                println("Nombre de solutions explorées par seconde : ", vitesse_exploration)
+                println("Valeur de la fonction objectif pondérée : ", objectif_pondere(meilleure_solution, adj,k))
+            else
+                println("graphe : ",graphe, " | k = ", k, " | type d'objectif : ",type_obj)
+                println("Valeur objectif pondérée initiale ", nb_conflits_initial )
+                println("Valeur objectif pondérée finale : ", nb_conflits_final )
+                println("durée de résolution : ", duree_resolution)
+                println("temps pour trouver la meilleure solution : ", temps_meilleure_solution)
+                println("Nombre de solutions explorées par seconde : ", vitesse_exploration)
+                println("Nombre de conflits final : ", nb_conflits(meilleure_solution, adj))
+            end
+        end
+    end
 end

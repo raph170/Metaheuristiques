@@ -11,7 +11,8 @@ function nb_conflits(solution, adj::Vector{Vector{Int}})
     return conflits
 end
 
-function objectif_pondere(solution, adj)
+function objectif_pondere(solution, adj, k)
+    n = size(adj,1)
     # C[u,c] = nombre de voisins de u de couleur c
     C = zeros(Int, n, k)
     for u in 1:n
@@ -23,6 +24,7 @@ function objectif_pondere(solution, adj)
 end
 
 function increment_n_conflit(A, adj, solution, avant_changements)
+    # finalement pas utilisée
     nb_conflit_initial = 0
     nb_conflit_final = 0
     for u in keys(avant_changements) # memes sommets pour avant et apres, seules les valeurs du dictionnaire (couleurs) changent
